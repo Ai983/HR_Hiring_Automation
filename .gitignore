@@ -1,0 +1,16 @@
+# Environment and secrets – never commit real keys
+.env
+.env.local
+.env.*.local
+src/env.generated.js
+
+# Dependencies
+node_modules/
+
+# Build / IDE
+dist/
+build/
+.idea/
+.vscode/
+*.log
+.DS_Store
