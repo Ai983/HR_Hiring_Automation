@@ -1,0 +1,97 @@
+{
+  "name": "Hagerstone — Call Retry (Not Picked)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 4 }
+          ]
+        }
+      },
+      "id": "schedule-retry",
+      "name": "Schedule — Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/call_logs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "call_status", "value": "eq.not_picked" },
+            { "name": "created_at", "value": "={{ 'gte.' + new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() }}" },
+            { "name": "select", "value": "id,applicant_id,created_at,applicants(full_name,phone)" },
+            { "name": "order", "value": "created_at.desc" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-not-picked",
+      "name": "Supabase — Fetch Not Picked Calls",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deduplicate by applicant_id (keep latest per candidate)\nconst data = $input.item.json;\nconst calls = Array.isArray(data) ? data : [data];\n\nif (!calls.length || !calls[0]?.id) return [];\n\n// Deduplicate: only contact each candidate once\nconst seen = new Set();\nconst unique = [];\nfor (const call of calls) {\n  if (!call.applicant_id || seen.has(call.applicant_id)) continue;\n  const phone = call.applicants?.phone;\n  if (!phone) continue;\n  seen.add(call.applicant_id);\n  const normalised = phone.replace(/^\\+?91/, '').replace(/\\D/g, '');\n  if (normalised.length === 10) {\n    unique.push({\n      name: call.applicants.full_name || 'Candidate',\n      to_number: '91' + normalised\n    });\n  }\n}\n\nreturn unique.map(u => ({ json: u }));"
+      },
+      "id": "deduplicate-candidates",
+      "name": "Deduplicate Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.maytapi.com/api/b8cce1b9-0f9f-4aef-994c-d232716471f0/46821/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to_number: $json.to_number, type: 'text', message: 'Hi ' + $json.name + ', we tried reaching you earlier regarding a job opportunity at Hagerstone. Please call us back or reply to this message at your convenience. Thank you!' }) }}",
+        "options": {}
+      },
+      "id": "whatsapp-retry",
+      "name": "Maytapi — WhatsApp Candidate Retry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Schedule — Every 4 Hours": {
+      "main": [[{ "node": "Supabase — Fetch Not Picked Calls", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Fetch Not Picked Calls": {
+      "main": [[{ "node": "Deduplicate Candidates", "type": "main", "index": 0 }]]
+    },
+    "Deduplicate Candidates": {
+      "main": [[{ "node": "Maytapi — WhatsApp Candidate Retry", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "id": "call-retry-v1",
+  "tags": [{ "name": "hagerstone" }, { "name": "calling" }, { "name": "automation" }]
+}

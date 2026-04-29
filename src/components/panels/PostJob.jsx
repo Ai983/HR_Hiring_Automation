@@ -92,14 +92,6 @@ export default function PostJob() {
     if (!selPortals.length) return showToast("Select at least one portal.", false);
     setPostLoading(true);
     setPostDone(false);
-    const prog = {};
-    selPortals.forEach((p) => (prog[p] = "pending"));
-    setPostStatus({ ...prog });
-
-    for (const p of selPortals) {
-      await new Promise((r) => setTimeout(r, 400 + Math.random() * 400));
-      setPostStatus((prev) => ({ ...prev, [p]: "done" }));
-    }
 
     const newAppJob = {
       title: form.title,
@@ -109,10 +101,7 @@ export default function PostJob() {
       exp: form.exp,
       salary: form.salary,
       postedDate: new Date().toISOString().split("T")[0],
-      linkedin: selPortals.includes("linkedin") ? { status: "live", applicants: 0, views: 0 } : null,
-      indeed: selPortals.includes("indeed") ? { status: "live", applicants: 0, views: 0 } : null,
-      jobhai: selPortals.includes("jobhai") ? { status: "live", applicants: 0, views: 0 } : null,
-      apna: selPortals.includes("apna") ? { status: "live", applicants: 0, views: 0 } : null,
+      ...Object.fromEntries(PORTALS.map((p) => [p.id, selPortals.includes(p.id) ? { status: "live", applicants: 0, views: 0 } : null])),
       jd: jdResult.jd,
       skills: jdResult.skills,
     };
@@ -121,7 +110,7 @@ export default function PostJob() {
       const saved = await createJob(newAppJob, jdResult, selPortals);
       setJobs((prev) => [saved, ...prev]);
       setPostDone(true);
-      showToast(`"${form.title}" saved. Copy enhanced JDs from the tabs to post on each portal.`);
+      showToast(`"${form.title}" saved — copy each portal's JD and open to post manually.`);
     } catch (e) {
       showToast("Failed to save job: " + e.message, false);
     }
@@ -151,7 +140,7 @@ export default function PostJob() {
   return (
     <div className="fade-in">
       <div className="page-title">Post a Job</div>
-      <div className="page-sub">Paste or upload your JD; AI enhances it for LinkedIn, Indeed, JobHai & Apna. Copy from tabs to post on each portal.</div>
+      <div className="page-sub">AI enhances your JD for each portal. One click copies the portal-optimised JD; next click opens the portal so you can paste and publish.</div>
 
       <div className="two-col">
         {/* Left: Form + JD result */}
@@ -277,41 +266,48 @@ export default function PostJob() {
             </div>
           )}
 
-          {/* Post progress */}
-          {Object.keys(postStatus).length > 0 && (
+          {/* Post-save: per-portal copy+open action panel */}
+          {postDone && (
             <div className="card">
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1612", marginBottom: 14, fontFamily: "'Fraunces',serif" }}>
-                {postDone ? "Posted Successfully" : "Posting in progress..."}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(34,197,94,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ color: "#22c55e", fontWeight: 800, fontSize: 14 }}>&#10003;</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1612", fontFamily: "'Fraunces',serif" }}>Job saved to HireFlow</div>
+                  <div style={{ fontSize: 12, color: "#8a7e72" }}>Copy each portal's enhanced JD, then open to paste and post</div>
+                </div>
               </div>
-              {PORTALS.filter((p) => postStatus[p.id]).map((p) => (
-                <div key={p.id} className="progress-item">
-                  <div
-                    style={{
-                      width: 30, height: 30, borderRadius: 8, background: p.bg,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontWeight: 800, fontSize: 13, color: p.color,
-                    }}
-                  >
+
+              {PORTALS.filter((p) => selPortals.includes(p.id)).map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #f0ece5" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: p.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, color: p.color, flexShrink: 0 }}>
                     {p.label.slice(0, 2)}
                   </div>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{p.label}</span>
-                  <div className="prog-icon" style={{ background: postStatus[p.id] === "done" ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.12)" }}>
-                    {postStatus[p.id] === "done" ? <span style={{ color: "#22c55e", fontWeight: 700 }}>&#10003;</span> : <span className="spinner" style={{ width: 14, height: 14 }} />}
-                  </div>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#1a1612" }}>{p.label}</span>
+                  {p.autoPost ? (
+                    <span style={{ fontSize: 11, background: `${p.color}18`, color: p.color, padding: "3px 9px", borderRadius: 20, fontWeight: 700 }}>⚡ n8n auto-post</span>
+                  ) : (
+                    <>
+                      <CopyButton text={getJdTextForTab(p.id)} label="Copy JD" />
+                      {p.postUrl && (
+                        <a href={p.postUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, border: `1.5px solid ${p.color}`, color: p.color, fontSize: 12, fontWeight: 700, background: p.bg, whiteSpace: "nowrap" }}>
+                          Open &rarr;
+                        </a>
+                      )}
+                    </>
+                  )}
                 </div>
               ))}
-              {postDone && (
-                <button
-                  className="btn-gold"
-                  style={{ marginTop: 14, width: "100%", justifyContent: "center" }}
-                  onClick={() => {
-                    resetPostForm();
-                    setPanel("jobs");
-                  }}
-                >
-                  View All Jobs &rarr;
-                </button>
-              )}
+
+              <button
+                className="btn-gold"
+                style={{ marginTop: 14, width: "100%", justifyContent: "center" }}
+                onClick={() => { resetPostForm(); setPanel("jobs"); }}
+              >
+                View All Jobs &rarr;
+              </button>
             </div>
           )}
         </div>
@@ -320,30 +316,16 @@ export default function PostJob() {
         <div style={{ position: "sticky", top: 24 }}>
           <div className="card">
             <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1612", marginBottom: 14, fontFamily: "'Fraunces',serif" }}>Select Portals</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
               {PORTALS.map((p) => {
                 const sel = selPortals.includes(p.id);
                 return (
                   <div key={p.id} className={`portal-chip ${sel ? p.chipCls : ""}`} onClick={() => setSelPortals((prev) => (sel ? prev.filter((x) => x !== p.id) : [...prev, p.id]))}>
-                    <div
-                      style={{
-                        width: 28, height: 28, borderRadius: 7, background: p.bg,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontWeight: 800, fontSize: 13, color: p.color,
-                      }}
-                    >
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: p.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, color: p.color }}>
                       {p.label[0]}
                     </div>
                     <span style={{ flex: 1 }}>{p.label}</span>
-                    <div
-                      style={{
-                        width: 18, height: 18, borderRadius: 5,
-                        border: `2px solid ${sel ? p.color : "#d0c8be"}`,
-                        background: sel ? p.color : "transparent",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 11, color: "#fff", transition: "all 0.15s",
-                      }}
-                    >
+                    <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? p.color : "#d0c8be"}`, background: sel ? p.color : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", transition: "all 0.15s" }}>
                       {sel && "\u2713"}
                     </div>
                   </div>
@@ -374,9 +356,9 @@ export default function PostJob() {
                   <span className="spinner" /> Posting...
                 </>
               ) : postDone ? (
-                "Posted!"
+                "Saved!"
               ) : (
-                `Post to ${selPortals.length || 0} Portal${selPortals.length !== 1 ? "s" : ""}`
+                `Save & Get Posting Links (${selPortals.length || 0} portal${selPortals.length !== 1 ? "s" : ""})`
               )}
             </button>
 

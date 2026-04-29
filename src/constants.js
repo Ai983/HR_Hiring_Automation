@@ -1,14 +1,19 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const STAGES = ["new", "screening", "interview", "offer", "hired", "rejected"];
+export const STAGES = [
+  "new", "screening", "calling", "interview", "reference", "offer", "hired", "onboarding", "rejected",
+];
 
 export const STAGE_META = {
-  new:       { label: "New",       color: "#6366f1", bg: "rgba(99,102,241,0.08)" },
-  screening: { label: "Screening", color: "#f59e0b", bg: "rgba(245,158,11,0.08)" },
-  interview: { label: "Interview", color: "#0ea5e9", bg: "rgba(14,165,233,0.08)" },
-  offer:     { label: "Offer",     color: "#22c55e", bg: "rgba(34,197,94,0.08)" },
-  hired:     { label: "Hired",     color: "#10b981", bg: "rgba(16,185,129,0.08)" },
-  rejected:  { label: "Rejected",  color: "#ef4444", bg: "rgba(239,68,68,0.08)" },
+  new:        { label: "New",        color: "#6366f1", bg: "rgba(99,102,241,0.08)" },
+  screening:  { label: "Screening",  color: "#f59e0b", bg: "rgba(245,158,11,0.08)" },
+  calling:    { label: "Calling",    color: "#0ea5e9", bg: "rgba(14,165,233,0.08)" },
+  interview:  { label: "Interview",  color: "#8b5cf6", bg: "rgba(139,92,246,0.08)" },
+  reference:  { label: "Reference",  color: "#f97316", bg: "rgba(249,115,22,0.08)" },
+  offer:      { label: "Offer",      color: "#22c55e", bg: "rgba(34,197,94,0.08)" },
+  hired:      { label: "Hired",      color: "#10b981", bg: "rgba(16,185,129,0.08)" },
+  onboarding: { label: "Onboarding", color: "#14b8a6", bg: "rgba(20,184,166,0.08)" },
+  rejected:   { label: "Rejected",   color: "#ef4444", bg: "rgba(239,68,68,0.08)" },
 };
 
 export const STATUS_META = {
@@ -41,11 +46,26 @@ export const JOB_ROLES = [
 ];
 
 export const PORTALS = [
-  { id: "linkedin", label: "LinkedIn", color: "#0a66c2", bg: "rgba(10,102,194,0.08)", chipCls: "sel-li" },
-  { id: "indeed",   label: "Indeed",   color: "#2b64e1", bg: "rgba(43,100,225,0.08)", chipCls: "sel-in" },
-  { id: "jobhai",   label: "JobHai",   color: "#059669", bg: "rgba(5,150,105,0.08)",  chipCls: "sel-jh" },
-  { id: "apna",     label: "Apna",     color: "#7c3aed", bg: "rgba(124,58,237,0.08)", chipCls: "sel-ap" },
+  { id: "linkedin",  label: "LinkedIn",  color: "#0a66c2", bg: "rgba(10,102,194,0.08)", chipCls: "sel-li", postUrl: "https://www.linkedin.com/jobs/post/" },
+  { id: "indeed",    label: "Indeed",    color: "#2b64e1", bg: "rgba(43,100,225,0.08)", chipCls: "sel-in", postUrl: "https://employers.indeed.com/jobposting" },
+  { id: "jobhai",    label: "JobHai",    color: "#059669", bg: "rgba(5,150,105,0.08)",  chipCls: "sel-jh", postUrl: "https://jobhai.com/post-a-job" },
+  { id: "apna",      label: "Apna",      color: "#7c3aed", bg: "rgba(124,58,237,0.08)", chipCls: "sel-ap", postUrl: "https://apna.co/business/postjob" },
+  { id: "facebook",  label: "Facebook",  color: "#1877f2", bg: "rgba(24,119,242,0.08)", chipCls: "sel-fb", autoPost: true },
+  { id: "instagram", label: "Instagram", color: "#e1306c", bg: "rgba(225,48,108,0.08)", chipCls: "sel-ig", autoPost: true },
 ];
+
+// Source metadata used for applicant source badges (all channels)
+export const SOURCE_META = {
+  linkedin:  { label: "LinkedIn",  color: "#0a66c2", bg: "rgba(10,102,194,0.10)" },
+  indeed:    { label: "Indeed",    color: "#2b64e1", bg: "rgba(43,100,225,0.10)" },
+  jobhai:    { label: "JobHai",    color: "#059669", bg: "rgba(5,150,105,0.10)"  },
+  apna:      { label: "Apna",      color: "#7c3aed", bg: "rgba(124,58,237,0.10)" },
+  email:     { label: "Email",     color: "#ea4335", bg: "rgba(234,67,53,0.10)"  },
+  whatsapp:  { label: "WhatsApp",  color: "#128c7e", bg: "rgba(18,140,126,0.10)" },
+  facebook:  { label: "Facebook",  color: "#1877f2", bg: "rgba(24,119,242,0.10)" },
+  instagram: { label: "Instagram", color: "#e1306c", bg: "rgba(225,48,108,0.10)" },
+  manual:    { label: "Manual",    color: "#8a7e72", bg: "rgba(138,126,114,0.10)"},
+};
 
 // ── Seed Data (used when Supabase not configured) ────────────────────────────
 export const SEED_JOBS = [

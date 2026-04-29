@@ -67,6 +67,28 @@ export async function screenApplicant(appId) {
   return data;
 }
 
+export async function updateApplicant(id, fields) {
+  if (!supabase) return;
+  const { data, error } = await supabase
+    .from("applicants")
+    .update(fields)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return dbApplicantToApp(data);
+}
+
+export async function checkDuplicate(email, phone) {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from("applicants")
+    .select("id, full_name, stage, email, phone")
+    .or(`email.eq.${email}${phone ? `,phone.eq.${phone}` : ""}`)
+    .limit(1);
+  return data?.[0] || null;
+}
+
 export async function deleteAllApplicants() {
   if (!supabase) return;
   const zero = "00000000-0000-0000-0000-000000000000";

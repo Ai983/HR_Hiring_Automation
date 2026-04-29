@@ -50,4 +50,12 @@ export default defineConfig({
     __VITE_SUPABASE_URL__: JSON.stringify(env.VITE_SUPABASE_URL || ""),
     __VITE_SUPABASE_ANON_KEY__: JSON.stringify(env.VITE_SUPABASE_ANON_KEY || ""),
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main:   path.join(__dirname, "index.html"),
+        attend: path.join(__dirname, "attend.html"),
+      },
+    },
+  },
 });

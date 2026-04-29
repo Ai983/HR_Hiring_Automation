@@ -1,0 +1,102 @@
+{
+  "name": "Hagerstone — Document Submission Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 2,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-doc",
+      "name": "Schedule — Every 2 Days at 9 AM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Runs at 3:30 AM UTC = 9:00 AM IST"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/joinings",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "in.(pre_joining,doc_pending,doc_submitted)" },
+            { "name": "select", "value": "*,applicants(full_name,phone,email)" },
+            { "name": "order", "value": "joining_date.asc" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-doc-pending",
+      "name": "Supabase — Fetch Joiners with Pending Docs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Send individual reminders to each joiner AND a summary to HR\nconst data = $input.item.json;\nconst joinings = Array.isArray(data) ? data : [data];\n\nif (!joinings.length || !joinings[0]?.id) return [];\n\n// Build one item per joiner for the WhatsApp send node\nconst items = joinings.map(j => {\n  const name = j.applicants?.full_name || 'New Joiner';\n  const phone = j.applicants?.phone || '';\n  const normalised = phone.replace(/^\\+?91/, '').replace(/\\D/g, '');\n  const joiningDate = j.joining_date || 'your joining date';\n  return {\n    candidate_name: name,\n    to_number: normalised.length === 10 ? '91' + normalised : null,\n    message: `Hi ${name}, your joining date at Hagerstone is ${joiningDate}. 📄 Please submit all required documents at the earliest to ensure a smooth onboarding. Contact HR at careers@hagerstone.com if you need help. Thank you!`\n  };\n}).filter(i => i.to_number);\n\nreturn items.map(i => ({ json: i }));"
+      },
+      "id": "format-doc-reminders",
+      "name": "Format Doc Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.maytapi.com/api/b8cce1b9-0f9f-4aef-994c-d232716471f0/46821/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to_number: $json.to_number, type: 'text', message: $json.message }) }}",
+        "options": {}
+      },
+      "id": "whatsapp-doc-reminder",
+      "name": "Maytapi — Send Doc Reminder to Joiner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Schedule — Every 2 Days at 9 AM IST": {
+      "main": [[{ "node": "Supabase — Fetch Joiners with Pending Docs", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Fetch Joiners with Pending Docs": {
+      "main": [[{ "node": "Format Doc Reminders", "type": "main", "index": 0 }]]
+    },
+    "Format Doc Reminders": {
+      "main": [[{ "node": "Maytapi — Send Doc Reminder to Joiner", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "id": "doc-reminder-v1",
+  "tags": [{ "name": "hagerstone" }, { "name": "onboarding" }, { "name": "documents" }]
+}

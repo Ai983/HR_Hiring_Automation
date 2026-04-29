@@ -1,0 +1,67 @@
+{
+  "name": "Hagerstone — New Applicant Acknowledgement",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-applicant",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-new-applicant",
+      "name": "Supabase — New Applicant Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "new-applicant-ack",
+      "notes": "Configure this URL in Supabase Dashboard → Database → Webhooks → Table: applicants → Event: INSERT"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Supabase sends: { type: 'INSERT', record: {...}, table: 'applicants' }\nconst body = $input.item.json.body || $input.item.json;\nconst record = body.record || body;\n\nif (!record.phone) {\n  // No phone number — skip WhatsApp\n  return [];\n}\n\n// Normalize phone: remove +91 prefix if present, ensure 10 digits\nconst phone = record.phone.replace(/^\\+?91/, '').replace(/\\D/g, '');\nif (phone.length !== 10) return [];\n\nreturn [{\n  json: {\n    phone: phone,\n    full_name: record.full_name || 'Candidate',\n    to_number: '91' + phone\n  }\n}];"
+      },
+      "id": "extract-contact",
+      "name": "Extract Contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.maytapi.com/api/b8cce1b9-0f9f-4aef-994c-d232716471f0/46821/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to_number: $json.to_number, type: 'text', message: 'Hi ' + $json.full_name + ', thank you for applying at Hagerstone! ✅ We have received your application and our HR team will review it shortly. We will get back to you soon.' }) }}",
+        "options": {}
+      },
+      "id": "whatsapp-ack",
+      "name": "Maytapi — Send Ack to Candidate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Supabase — New Applicant Webhook": {
+      "main": [[{ "node": "Extract Contact", "type": "main", "index": 0 }]]
+    },
+    "Extract Contact": {
+      "main": [[{ "node": "Maytapi — Send Ack to Candidate", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "id": "ack-flow-v1",
+  "tags": [{ "name": "hagerstone" }, { "name": "notifications" }]
+}

@@ -8,6 +8,14 @@ import AllJobs from "./components/panels/AllJobs.jsx";
 import Applicants from "./components/panels/Applicants.jsx";
 import Questionnaire from "./components/panels/Questionnaire.jsx";
 import ResumeReport from "./components/panels/ResumeReport.jsx";
+import AttendanceAdmin from "./components/panels/AttendanceAdmin.jsx";
+import EmployeeManagement from "./components/panels/EmployeeManagement.jsx";
+import CallingQueue from "./components/panels/CallingQueue.jsx";
+import Interviews from "./components/panels/Interviews.jsx";
+import ReferenceCheck from "./components/panels/ReferenceCheck.jsx";
+import OfferLetters from "./components/panels/OfferLetters.jsx";
+import Onboarding from "./components/panels/Onboarding.jsx";
+import Documents from "./components/panels/Documents.jsx";
 import ApplicantModal from "./components/modals/ApplicantModal.jsx";
 import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 
@@ -23,12 +31,20 @@ function AppContent() {
       <div className="app">
         <Sidebar />
         <main className="main">
-          {panel === "dashboard" && <Dashboard />}
-          {panel === "post" && <PostJob />}
-          {panel === "jobs" && <AllJobs />}
-          {panel === "applicants" && <Applicants />}
-          {panel === "questionnaire" && <Questionnaire />}
-          {panel === "report" && <ResumeReport />}
+          {panel === "dashboard"    && <Dashboard />}
+          {panel === "post"         && <PostJob />}
+          {panel === "jobs"         && <AllJobs />}
+          {panel === "applicants"   && <Applicants />}
+          {panel === "calling"      && <CallingQueue />}
+          {panel === "interviews"   && <Interviews />}
+          {panel === "reference"    && <ReferenceCheck />}
+          {panel === "offers"       && <OfferLetters />}
+          {panel === "onboarding"   && <Onboarding />}
+          {panel === "documents"    && <Documents />}
+          {panel === "questionnaire"&& <Questionnaire />}
+          {panel === "report"       && <ResumeReport />}
+          {panel === "attendance"   && <AttendanceAdmin />}
+          {panel === "employees"    && <EmployeeManagement />}
         </main>
       </div>
     </>

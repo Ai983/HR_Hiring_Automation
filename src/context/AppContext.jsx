@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabaseClient.js";
 import { SEED_JOBS, SEED_APPLICANTS } from "../constants.js";
 import { useToast } from "../hooks/useToast.js";
@@ -16,10 +16,8 @@ export function AppProvider({ children }) {
   const [loading, setLoading] = useState(!!supabase);
   const { toast, showToast } = useToast();
 
-  // Load data from Supabase on mount
   useEffect(() => {
     if (!supabase) {
-      // Use seed data when Supabase is not configured
       setJobs(SEED_JOBS);
       setApplicants(SEED_APPLICANTS);
       return;
@@ -32,9 +30,16 @@ export function AppProvider({ children }) {
     })();
   }, []);
 
+  const refreshApplicants = useCallback(async () => {
+    if (!supabase) return;
+    const apps = await fetchApplicants();
+    setApplicants(apps);
+  }, []);
+
   const value = {
     jobs, setJobs,
     applicants, setApplicants,
+    refreshApplicants,
     panel, setPanel,
     selectedJob, setSelectedJob,
     modal, setModal,

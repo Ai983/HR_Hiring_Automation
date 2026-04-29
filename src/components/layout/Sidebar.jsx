@@ -7,8 +7,14 @@ import { deleteAllApplicants } from "../../services/applicantService.js";
 export default function Sidebar() {
   const { panel, setPanel, jobs, applicants, setJobs, setApplicants, setSelectedJob, setModal, showToast } = useApp();
 
-  const liveJobs = jobs.filter((j) => PORTALS.some((p) => j[p.id]?.status === "live")).length;
-  const newApps = applicants.filter((a) => a.stage === "new").length;
+  const liveJobs    = jobs.filter((j) => PORTALS.some((p) => j[p.id]?.status === "live")).length;
+  const newApps     = applicants.filter((a) => a.stage === "new").length;
+  const callingQ    = applicants.filter((a) => a.stage === "screening" && a.shortlisted).length
+                    + applicants.filter((a) => a.stage === "calling").length;
+  const interviews  = applicants.filter((a) => a.stage === "interview").length;
+  const references  = applicants.filter((a) => a.stage === "reference").length;
+  const offers      = applicants.filter((a) => a.stage === "offer").length;
+  const onboardings = applicants.filter((a) => a.stage === "hired" || a.stage === "onboarding").length;
 
   const clearAllData = async () => {
     if (!window.confirm("Clear all jobs and applicants? This cannot be undone.")) return;
@@ -22,12 +28,23 @@ export default function Sidebar() {
   };
 
   const navItems = [
-    { id: "dashboard",     icon: "\u2B1B", label: "Dashboard" },
-    { id: "post",          icon: "\u2726", label: "Post a Job" },
-    { id: "jobs",          icon: "\u2261", label: "All Jobs",        badge: liveJobs },
-    { id: "applicants",    icon: "\u25CE", label: "Applicants",      badge: newApps },
-    { id: "questionnaire", icon: "\u2753", label: "Questionnaire" },
-    { id: "report",        icon: "\u2630", label: "Resume Report" },
+    { id: "dashboard",     icon: "⬛", label: "Dashboard" },
+    { id: "post",          icon: "✦", label: "Post a Job" },
+    { id: "jobs",          icon: "≡", label: "All Jobs",        badge: liveJobs },
+    { id: "applicants",    icon: "◎", label: "Applicants",      badge: newApps },
+    { id: "divider1" },
+    { id: "calling",       icon: "☎", label: "Calling Queue",   badge: callingQ },
+    { id: "interviews",    icon: "\u{1F4C5}", label: "Interviews",   badge: interviews },
+    { id: "reference",     icon: "✅", label: "Reference Check", badge: references },
+    { id: "offers",        icon: "\u{1F4DD}", label: "Offer Letters",badge: offers },
+    { id: "onboarding",    icon: "\u{1F3E0}", label: "Onboarding",   badge: onboardings },
+    { id: "documents",     icon: "\u{1F4C4}", label: "Documents" },
+    { id: "divider2" },
+    { id: "questionnaire", icon: "❓", label: "Questionnaire" },
+    { id: "report",        icon: "☰", label: "Resume Report" },
+    { id: "divider3" },
+    { id: "attendance",    icon: "⏰", label: "Attendance" },
+    { id: "employees",     icon: "▦", label: "Employees" },
   ];
 
   return (
@@ -39,20 +56,24 @@ export default function Sidebar() {
         </div>
       </div>
       <nav className="sidebar-nav">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            className={`nav-item ${panel === item.id ? "active" : ""}`}
-            onClick={() => {
-              setPanel(item.id);
-              if (item.id !== "applicants") setSelectedJob(null);
-            }}
-          >
-            <span className="nav-icon">{item.icon}</span>
-            {item.label}
-            {item.badge > 0 && <span className="nav-badge">{item.badge}</span>}
-          </button>
-        ))}
+        {navItems.map((item) =>
+          item.id.startsWith("divider") ? (
+            <div key={item.id} style={{ height: 1, background: "#2e2925", margin: "8px 0" }} />
+          ) : (
+            <button
+              key={item.id}
+              className={`nav-item ${panel === item.id ? "active" : ""}`}
+              onClick={() => {
+                setPanel(item.id);
+                if (item.id !== "applicants") setSelectedJob(null);
+              }}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {item.label}
+              {item.badge > 0 && <span className="nav-badge">{item.badge}</span>}
+            </button>
+          )
+        )}
       </nav>
       <div className="sidebar-footer">
         <div className="user-pill">

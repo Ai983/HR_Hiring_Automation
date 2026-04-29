@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { generateQuestionnaire } from "../../services/aiService.js";
-import { JOB_ROLES } from "../../constants.js";
+import { JOB_ROLES, SOURCE_META, STAGE_META } from "../../constants.js";
 import { resolveJobIdForRole } from "../../services/jobService.js";
 import CopyButton from "../shared/CopyButton.jsx";
 
@@ -30,17 +30,41 @@ async function extractTextFromFile(file) {
 }
 
 export default function Questionnaire() {
-  const { jobs, setJobs, showToast } = useApp();
+  const { jobs, setJobs, applicants, showToast } = useApp();
 
-  const [selectedJobId, setSelectedJobId] = useState("");
-  const [interviewType, setInterviewType] = useState("hr");
-  const [customTopics, setCustomTopics] = useState("");
-  const [jdPaste, setJdPaste] = useState("");
-  const [jdFile, setJdFile] = useState(null);
-  const [data, setData] = useState(null);
-  const [generating, setGenerating] = useState(false);
+  const [selectedCandidateId, setSelectedCandidateId] = useState("");
+  const [selectedJobId, setSelectedJobId]               = useState("");
+  const [interviewType, setInterviewType]               = useState("hr");
+  const [customTopics, setCustomTopics]                 = useState("");
+  const [jdPaste, setJdPaste]                           = useState("");
+  const [jdFile, setJdFile]                             = useState(null);
+  const [data, setData]                                 = useState(null);
+  const [generating, setGenerating]                     = useState(false);
 
   const selectedJob = jobs.find((j) => j.id === selectedJobId);
+
+  // Screened candidates: has AI score or screening notes, not rejected
+  const screenedCandidates = applicants
+    .filter((a) => (a.score > 0 || a.screening_notes) && a.stage !== "rejected")
+    .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  const selectedCandidate = applicants.find((a) => a.id === selectedCandidateId) || null;
+
+  // When a candidate is selected, pre-fill job + JD
+  useEffect(() => {
+    if (!selectedCandidateId) return;
+    const cand = applicants.find((a) => a.id === selectedCandidateId);
+    if (!cand) return;
+    if (cand.jobId) {
+      setSelectedJobId(cand.jobId);
+      const job = jobs.find((j) => j.id === cand.jobId);
+      if (job?.jd) setJdPaste(job.jd);
+    }
+    // Seed custom topics from screening notes
+    if (cand.screening_notes) {
+      setCustomTopics(`Candidate context: ${cand.screening_notes}`);
+    }
+  }, [selectedCandidateId]);
 
   const handleJdFileChange = async (file) => {
     setJdFile(file || null);
@@ -199,9 +223,47 @@ export default function Questionnaire() {
         <div>
           {!data && !generating && (
             <div className="card" style={{ textAlign: "center", padding: "48px 24px", color: "#8a7e72" }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>&#x2753;</div>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>Select a job and interview type, then generate.</div>
-              <div style={{ fontSize: 12, marginTop: 6 }}>AI will create tailored questions for your interview process.</div>
+              {screenedCandidates.length > 0 && !selectedCandidateId ? (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#5a5048", marginBottom: 12 }}>
+                    {screenedCandidates.length} screened candidate{screenedCandidates.length > 1 ? "s" : ""} — pick one to pre-fill
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto", marginBottom: 16 }}>
+                    {screenedCandidates.map((a) => {
+                      const job = jobs.find((j) => j.id === a.jobId);
+                      const src = SOURCE_META[a.portal] || SOURCE_META.manual;
+                      return (
+                        <div
+                          key={a.id}
+                          style={{ display: "flex", alignItems: "center", gap: 10, background: "#faf8f5", borderRadius: 10, padding: "10px 12px", cursor: "pointer", border: "1.5px solid #e8e2d9", textAlign: "left" }}
+                          onClick={() => setSelectedCandidateId(a.id)}
+                        >
+                          <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#f0ece5", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, color: "#5a5048", flexShrink: 0 }}>
+                            {a.name?.[0]?.toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: "#1a1612" }}>{a.name}</div>
+                            <div style={{ fontSize: 11, color: "#8a7e72" }}>{job?.title || "No role"}</div>
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+                            {a.score > 0 && (
+                              <span style={{ fontSize: 11, fontWeight: 800, color: a.score >= 85 ? "#22c55e" : a.score >= 70 ? "#f59e0b" : "#ef4444" }}>{a.score}/100</span>
+                            )}
+                            <span style={{ fontSize: 10, fontWeight: 700, background: src.bg, color: src.color, padding: "1px 6px", borderRadius: 20 }}>{src.label}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#b0a898" }}>Or select a job on the right and generate a general questionnaire.</div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>&#x2753;</div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Select a job and interview type, then generate.</div>
+                  <div style={{ fontSize: 12, marginTop: 6 }}>AI will create tailored questions for your interview process.</div>
+                </>
+              )}
             </div>
           )}
 
@@ -245,6 +307,67 @@ export default function Questionnaire() {
         <div style={{ position: "sticky", top: 24 }}>
           <div className="card">
             <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1612", marginBottom: 14, fontFamily: "'Fraunces',serif" }}>Configuration</div>
+
+            {/* ── Candidate selector ── */}
+            <div className="form-field" style={{ marginBottom: 14 }}>
+              <label className="form-label">Candidate (optional — pre-fills job &amp; JD)</label>
+              <select
+                className="form-input"
+                value={selectedCandidateId}
+                onChange={(e) => {
+                  setSelectedCandidateId(e.target.value);
+                  if (!e.target.value) { setSelectedJobId(""); setJdPaste(""); setCustomTopics(""); }
+                }}
+              >
+                <option value="">— General / No specific candidate —</option>
+                {screenedCandidates.map((a) => {
+                  const job = jobs.find((j) => j.id === a.jobId);
+                  const score = a.score > 0 ? ` · ${a.score}/100` : "";
+                  return (
+                    <option key={a.id} value={a.id}>
+                      {a.name}{job ? ` — ${job.title}` : ""}
+                      {score}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Selected candidate info card */}
+            {selectedCandidate && (
+              <div style={{ background: "#faf8f5", border: "1.5px solid #e8e2d9", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f0ece5", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, color: "#5a5048", flexShrink: 0 }}>
+                    {selectedCandidate.name?.[0]?.toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#1a1612", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selectedCandidate.name}</div>
+                    <div style={{ fontSize: 11, color: "#8a7e72" }}>{selectedCandidate.email}</div>
+                  </div>
+                  {selectedCandidate.score > 0 && (
+                    <span style={{ fontSize: 12, fontWeight: 800, color: selectedCandidate.score >= 85 ? "#22c55e" : selectedCandidate.score >= 70 ? "#f59e0b" : "#ef4444" }}>
+                      {selectedCandidate.score}/100
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: STAGE_META[selectedCandidate.stage]?.bg, color: STAGE_META[selectedCandidate.stage]?.color, padding: "2px 8px", borderRadius: 20 }}>
+                    {STAGE_META[selectedCandidate.stage]?.label}
+                  </span>
+                  {selectedCandidate.portal && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: SOURCE_META[selectedCandidate.portal]?.bg, color: SOURCE_META[selectedCandidate.portal]?.color, padding: "2px 8px", borderRadius: 20 }}>
+                      {SOURCE_META[selectedCandidate.portal]?.label}
+                    </span>
+                  )}
+                </div>
+                {selectedCandidate.screening_notes && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: "#5a5048", lineHeight: 1.5, borderTop: "1px solid #ede6db", paddingTop: 8 }}>
+                    <span style={{ fontWeight: 700, color: "#8a7e72" }}>AI Notes: </span>
+                    {selectedCandidate.screening_notes.slice(0, 200)}{selectedCandidate.screening_notes.length > 200 ? "…" : ""}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="form-field" style={{ marginBottom: 14 }}>
               <label className="form-label">Select Job *</label>
