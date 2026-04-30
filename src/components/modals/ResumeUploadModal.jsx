@@ -4,32 +4,9 @@ import { PORTALS, JOB_ROLES } from "../../constants.js";
 import { supabase, supabaseUrl, supabaseAnon } from "../../supabaseClient.js";
 import { createApplicant, uploadResumeFile, screenApplicant } from "../../services/applicantService.js";
 import { resolveJobIdForRole } from "../../services/jobService.js";
+import { extractResumeText } from "../../services/resumeParser.js";
 import { dbApplicantToApp } from "../../mappers.js";
 import { uid } from "../../helpers.js";
-
-async function extractResumeText(file) {
-  const type = file.type || "";
-  if (type.includes("pdf")) {
-    const pdfjs = await import("pdfjs-dist");
-    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`;
-    const arr = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument(arr).promise;
-    let text = "";
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      text += content.items.map((it) => it.str).join(" ") + "\n";
-    }
-    return text.trim();
-  }
-  if (type.includes("wordprocessingml") || type.includes("msword") || file.name?.toLowerCase().endsWith(".docx")) {
-    const mammoth = await import("mammoth");
-    const arr = await file.arrayBuffer();
-    const { value } = await mammoth.extractRawText({ arrayBuffer: arr });
-    return (value || "").trim();
-  }
-  return "";
-}
 
 export default function ResumeUploadModal({ initialJobId, onClose }) {
   const { jobs, setJobs, setApplicants, showToast } = useApp();

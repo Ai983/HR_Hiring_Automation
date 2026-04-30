@@ -5,8 +5,7 @@ export async function fetchCallQueue() {
   const { data } = await supabase
     .from("applicants")
     .select("*, jobs(title, jd)")
-    .in("stage", ["screening", "calling"])
-    .eq("shortlisted", true)
+    .in("stage", ["calling"])
     .order("ai_score", { ascending: false });
   return data || [];
 }

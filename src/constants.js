@@ -67,6 +67,20 @@ export const SOURCE_META = {
   manual:    { label: "Manual",    color: "#8a7e72", bg: "rgba(138,126,114,0.10)"},
 };
 
+export const SURVEY_SOURCES = [
+  { id: "facebook",  label: "Facebook",  color: "#1877f2", bg: "rgba(24,119,242,0.08)" },
+  { id: "instagram", label: "Instagram", color: "#e1306c", bg: "rgba(225,48,108,0.08)" },
+  { id: "apna",      label: "Apna",      color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
+  { id: "linkedin",  label: "LinkedIn",  color: "#0a66c2", bg: "rgba(10,102,194,0.08)" },
+];
+
+export const AI_RECOMMENDATIONS = {
+  strong_recommend: { label: "Strong ★",  color: "#10b981", bg: "rgba(16,185,129,0.1)"  },
+  recommend:        { label: "Recommend", color: "#22c55e", bg: "rgba(34,197,94,0.1)"   },
+  borderline:       { label: "Borderline",color: "#f59e0b", bg: "rgba(245,158,11,0.1)"  },
+  reject:           { label: "Reject",    color: "#ef4444", bg: "rgba(239,68,68,0.1)"   },
+};
+
 // ── Seed Data (used when Supabase not configured) ────────────────────────────
 export const SEED_JOBS = [
   {

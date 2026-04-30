@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { STAGES, STAGE_META, SOURCE_META } from "../../constants.js";
 import { fmtDate } from "../../helpers.js";
-import { updateApplicantStage, createApplicant } from "../../services/applicantService.js";
+import { updateApplicantStage, createApplicant, uploadResumeFile, screenApplicant } from "../../services/applicantService.js";
+import { extractResumeText, parseResumeInfo } from "../../services/resumeParser.js";
 import { fetchInterviews } from "../../services/interviewService.js";
 
 const OVERLAY = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
@@ -18,6 +19,10 @@ export default function Applicants() {
   const [quickAdd, setQuickAdd] = useState(null); // null | stage string
   const [qaForm, setQaForm]     = useState({ name: "", email: "", phone: "", jobId: "", portal: "manual" });
   const [qaSaving, setQaSaving] = useState(false);
+  const [qaResume, setQaResume]   = useState(null);
+  const [qaResumeText, setQaResumeText] = useState("");
+  const [qaParsing, setQaParsing] = useState(false);
+  const qaFileRef = useRef(null);
 
   // fetch scheduled interviews to show badge on cards
   useEffect(() => {
@@ -44,13 +49,47 @@ export default function Applicants() {
   const openQuickAdd = (stage) => {
     setQuickAdd(stage);
     setQaForm({ name: "", email: "", phone: "", jobId: selectedJob || "", portal: "manual" });
+    setQaResume(null);
+    setQaResumeText("");
+    setQaParsing(false);
+  };
+
+  const handleQaResume = async (file) => {
+    if (!file) { setQaResume(null); setQaResumeText(""); return; }
+    setQaResume(file);
+    setQaParsing(true);
+    try {
+      const text = await extractResumeText(file);
+      setQaResumeText(text || "");
+      if (text) {
+        const { name, email, phone } = parseResumeInfo(text);
+        setQaForm((f) => ({
+          ...f,
+          name:  name  || f.name,
+          email: email || f.email,
+          phone: phone || f.phone,
+        }));
+        showToast("Resume parsed — fields auto-filled. Please verify before saving.");
+      } else {
+        showToast("No text found in resume. Fill fields manually.", false);
+      }
+    } catch {
+      showToast("Could not read resume. Fill fields manually.", false);
+    }
+    setQaParsing(false);
   };
 
   const saveQuickAdd = async () => {
     if (!qaForm.name.trim() || !qaForm.email.trim()) return showToast("Name and email are required.", false);
     setQaSaving(true);
     try {
-      await createApplicant({
+      let resumePath = null;
+      if (qaResume && qaForm.jobId) {
+        const ext = qaResume.name.split(".").pop() || "pdf";
+        resumePath = `${qaForm.jobId}/${crypto.randomUUID()}.${ext}`;
+        await uploadResumeFile(resumePath, qaResume);
+      }
+      const newApp = await createApplicant({
         full_name: qaForm.name.trim(),
         email: qaForm.email.trim(),
         phone: qaForm.phone.trim() || null,
@@ -58,10 +97,27 @@ export default function Applicants() {
         portal: qaForm.portal,
         stage: quickAdd,
         applied_at: new Date().toISOString(),
+        resume_path: resumePath,
+        resume_text: qaResumeText || null,
       });
-      await refreshApplicants();
+      setApplicants((prev) => [newApp, ...prev]);
       setQuickAdd(null);
       showToast("Applicant added.");
+      if (qaResumeText?.trim() && newApp.id) {
+        try {
+          const data = await screenApplicant(newApp.id);
+          setApplicants((prev) =>
+            prev.map((a) =>
+              a.id === newApp.id
+                ? { ...a, score: data.score, shortlisted: data.shortlisted, screening_notes: data.screening_notes }
+                : a
+            )
+          );
+          showToast(`AI Score: ${data.score}/100${data.shortlisted ? " · Shortlisted ✓" : ""}`);
+        } catch {
+          showToast("AI screening failed — open applicant card to retry.", false);
+        }
+      }
     } catch (e) {
       showToast(e.message, false);
     }
@@ -226,6 +282,41 @@ export default function Applicants() {
               <button className="btn-ghost" onClick={() => setQuickAdd(null)} style={{ fontSize: 18 }}>✕</button>
             </div>
 
+            {/* Resume upload — auto-fills fields */}
+            <div
+              style={{ border: "2px dashed #e8e2d9", borderRadius: 12, padding: "14px 16px", marginBottom: 18, background: qaResume ? "rgba(34,197,94,0.04)" : "#faf8f5", cursor: "pointer", transition: "border-color 0.15s", borderColor: qaResume ? "#22c55e" : "#e8e2d9" }}
+              onClick={() => qaFileRef.current?.click()}
+            >
+              <input
+                ref={qaFileRef}
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                style={{ display: "none" }}
+                onChange={(e) => handleQaResume(e.target.files?.[0] || null)}
+              />
+              {qaParsing ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#c97a2a" }}>
+                  <span className="spinner" /> Parsing resume…
+                </div>
+              ) : qaResume ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>📄</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1612" }}>{qaResume.name}</div>
+                    <div style={{ fontSize: 11, color: "#22c55e", marginTop: 2 }}>✓ Parsed — fields auto-filled · Click to change</div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#8a7e72" }}>
+                  <span style={{ fontSize: 24 }}>📋</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Upload Resume (optional)</div>
+                    <div style={{ fontSize: 11, marginTop: 2 }}>PDF or DOCX · Auto-fills name, email & phone</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="form-grid">
               <div className="form-field" style={{ gridColumn: "span 2" }}>
                 <label className="form-label">Full Name *</label>
@@ -275,8 +366,10 @@ export default function Applicants() {
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
               <button className="btn-outline" onClick={() => setQuickAdd(null)}>Cancel</button>
-              <button className="btn-gold" onClick={saveQuickAdd} disabled={qaSaving}>
-                {qaSaving ? <><span className="spinner" /> Saving...</> : "Save Applicant"}
+              <button className="btn-gold" onClick={saveQuickAdd} disabled={qaSaving || qaParsing}>
+                {qaSaving
+                  ? <><span className="spinner" /> {qaResume ? "Uploading & Screening…" : "Saving…"}</>
+                  : qaResume ? "Save & Screen with AI" : "Save Applicant"}
               </button>
             </div>
           </div>

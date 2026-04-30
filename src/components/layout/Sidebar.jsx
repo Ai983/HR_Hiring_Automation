@@ -1,11 +1,20 @@
+import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { PORTALS } from "../../constants.js";
 import { supabase } from "../../supabaseClient.js";
 import { deleteAllJobs } from "../../services/jobService.js";
 import { deleteAllApplicants } from "../../services/applicantService.js";
+import { fetchSurveyNewCount } from "../../services/surveyService.js";
 
 export default function Sidebar() {
   const { panel, setPanel, jobs, applicants, setJobs, setApplicants, setSelectedJob, setModal, showToast } = useApp();
+  const [surveyCount, setSurveyCount] = useState(0);
+
+  useEffect(() => {
+    fetchSurveyNewCount().then(setSurveyCount);
+    const interval = setInterval(() => fetchSurveyNewCount().then(setSurveyCount), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const liveJobs    = jobs.filter((j) => PORTALS.some((p) => j[p.id]?.status === "live")).length;
   const newApps     = applicants.filter((a) => a.stage === "new").length;
@@ -32,6 +41,7 @@ export default function Sidebar() {
     { id: "post",          icon: "✦", label: "Post a Job" },
     { id: "jobs",          icon: "≡", label: "All Jobs",        badge: liveJobs },
     { id: "applicants",    icon: "◎", label: "Applicants",      badge: newApps },
+    { id: "survey",        icon: "📋", label: "Survey Leads",    badge: surveyCount },
     { id: "divider1" },
     { id: "calling",       icon: "☎", label: "Calling Queue",   badge: callingQ },
     { id: "interviews",    icon: "\u{1F4C5}", label: "Interviews",   badge: interviews },

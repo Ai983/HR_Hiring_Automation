@@ -16,6 +16,7 @@ import ReferenceCheck from "./components/panels/ReferenceCheck.jsx";
 import OfferLetters from "./components/panels/OfferLetters.jsx";
 import Onboarding from "./components/panels/Onboarding.jsx";
 import Documents from "./components/panels/Documents.jsx";
+import SurveyLeads from "./components/panels/SurveyLeads.jsx";
 import ApplicantModal from "./components/modals/ApplicantModal.jsx";
 import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 
@@ -43,6 +44,7 @@ function AppContent() {
           {panel === "documents"    && <Documents />}
           {panel === "questionnaire"&& <Questionnaire />}
           {panel === "report"       && <ResumeReport />}
+          {panel === "survey"        && <SurveyLeads />}
           {panel === "attendance"   && <AttendanceAdmin />}
           {panel === "employees"    && <EmployeeManagement />}
         </main>
