@@ -1,0 +1,106 @@
+{
+  "name": "Hagerstone — Probation End Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-probation",
+      "name": "Schedule — Daily at 9 AM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Runs daily at 3:30 AM UTC = 9:00 AM IST"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/joinings",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "probation_end_date", "value": "={{ 'gte.' + new Date().toISOString().split('T')[0] }}" },
+            { "name": "probation_end_date2", "value": "={{ 'lte.' + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }}" },
+            { "name": "status", "value": "in.(joined,induction_done,probation_active)" },
+            { "name": "select", "value": "*,applicants(full_name)" },
+            { "name": "order", "value": "probation_end_date.asc" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-probation-due",
+      "name": "Supabase — Fetch Probations Due in 30 Days",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "notes": "PostgREST doesn't allow duplicate param keys — use a Code node to build query dynamically if needed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a summary WhatsApp message for HR about upcoming probation reviews\nconst data = $input.item.json;\nconst joinings = Array.isArray(data) ? data : [data];\n\nif (!joinings.length || !joinings[0]?.id) return [];\n\nconst today = new Date();\nconst lines = joinings.map(j => {\n  const name = j.applicants?.full_name || 'Unknown';\n  const endDate = j.probation_end_date || 'N/A';\n  const daysLeft = j.probation_end_date\n    ? Math.ceil((new Date(j.probation_end_date) - today) / (1000 * 60 * 60 * 24))\n    : '?';\n  return `• ${name} — ends ${endDate} (${daysLeft} days left)`;\n});\n\nconst message = `📋 *Probation Review Alert* — ${joinings.length} employee(s) ending within 30 days\\n\\n${lines.join('\\n')}\\n\\n_Please initiate performance review and confirmation process in HireFlow._`;\n\nreturn [{ json: { message, count: joinings.length } }];"
+      },
+      "id": "format-probation-summary",
+      "name": "Format Probation Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.maytapi.com/api/b8cce1b9-0f9f-4aef-994c-d232716471f0/46821/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to_number: $env.HR_WHATSAPP_NUMBER || '91XXXXXXXXXX', type: 'text', message: $json.message }) }}",
+        "options": {}
+      },
+      "id": "notify-hr-probation",
+      "name": "Maytapi — Notify HR of Probation Reviews",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300],
+      "notes": "⚠️ Set HR_WHATSAPP_NUMBER in n8n Settings → Variables (format: 91XXXXXXXXXX)"
+    }
+  ],
+  "connections": {
+    "Schedule — Daily at 9 AM IST": {
+      "main": [[{ "node": "Supabase — Fetch Probations Due in 30 Days", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Fetch Probations Due in 30 Days": {
+      "main": [[{ "node": "Format Probation Summary", "type": "main", "index": 0 }]]
+    },
+    "Format Probation Summary": {
+      "main": [[{ "node": "Maytapi — Notify HR of Probation Reviews", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "id": "probation-reminder-v1",
+  "tags": [{ "name": "hagerstone" }, { "name": "onboarding" }, { "name": "probation" }]
+}

@@ -1,0 +1,188 @@
+{
+  "name": "Hagerstone — Gmail Resume Collector",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {
+          "includeSpamTrash": false
+        }
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail — New Email (careers inbox)",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Gmail OAuth2 — careers@hagerstone.com"
+        }
+      },
+      "notes": "Polls careers@hagerstone.com every minute for new emails. Set up credential using Client ID: 426737655706-g77nn7g71gtm85tb6c69lcpiv9bihm7i.apps.googleusercontent.com"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-attachment",
+              "leftValue": "={{ $json.attachments && $json.attachments.length > 0 }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-has-attachment",
+      "name": "Filter — Has Attachment",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract sender name + email from Gmail message\nconst from = $input.item.json.from || '';\nconst subject = $input.item.json.subject || '';\nconst body = $input.item.json.text || $input.item.json.snippet || '';\n\n// Parse \"Name <email>\" format\nconst emailMatch = from.match(/<(.+?)>/);\nconst nameMatch = from.match(/^(.+?)</);\n\nconst senderEmail = emailMatch ? emailMatch[1].trim() : from.trim();\nconst senderName = nameMatch ? nameMatch[1].trim().replace(/\"/g,'') : senderEmail.split('@')[0];\n\n// Try to guess phone from email body\nconst phoneMatch = body.match(/(?:\\+?91[\\s-]?)?[6-9]\\d{9}/);\nconst phone = phoneMatch ? phoneMatch[0].replace(/[\\s-]/g,'') : '';\n\nreturn {\n  json: {\n    full_name: senderName,\n    email: senderEmail,\n    phone: phone,\n    subject: subject,\n    body_snippet: body.slice(0, 500),\n    attachments: $input.item.json.attachments || []\n  }\n};"
+      },
+      "id": "extract-sender",
+      "name": "Extract Sender Details",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "1" },
+            { "name": "select", "value": "id,title" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-latest-job",
+      "name": "Supabase — Get Latest Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge sender details + job_id for the applicant insert\nconst sender = $('Extract Sender Details').item.json;\nconst jobs = $input.item.json;\nconst job = Array.isArray(jobs) ? jobs[0] : jobs;\n\nreturn {\n  json: {\n    job_id: job?.id || null,\n    full_name: sender.full_name,\n    email: sender.email,\n    phone: sender.phone || null,\n    portal: 'email',\n    stage: 'new',\n    resume_text: sender.body_snippet,\n    screening_notes: `Via email — Subject: ${sender.subject}`,\n    applied_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "build-applicant",
+      "name": "Build Applicant Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/applicants",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "insert-applicant",
+      "name": "Supabase — Insert Applicant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/functions/v1/screen-resume",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDk4OTAsImV4cCI6MjA4ODg4NTg5MH0.MKbjEb6fgwLurjdHP2NVSbfebufb6AyaKCR69rhnaik" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ applicant_id: $('Supabase — Insert Applicant').item.json[0].id, job_id: $('Build Applicant Record').item.json.job_id }) }}",
+        "options": {}
+      },
+      "id": "ai-screen",
+      "name": "Edge Fn — AI Screen Resume",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 300]
+    }
+  ],
+  "connections": {
+    "Gmail — New Email (careers inbox)": {
+      "main": [[{ "node": "Filter — Has Attachment", "type": "main", "index": 0 }]]
+    },
+    "Filter — Has Attachment": {
+      "main": [[{ "node": "Extract Sender Details", "type": "main", "index": 0 }]]
+    },
+    "Extract Sender Details": {
+      "main": [[{ "node": "Supabase — Get Latest Job", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Get Latest Job": {
+      "main": [[{ "node": "Build Applicant Record", "type": "main", "index": 0 }]]
+    },
+    "Build Applicant Record": {
+      "main": [[{ "node": "Supabase — Insert Applicant", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Insert Applicant": {
+      "main": [[{ "node": "Edge Fn — AI Screen Resume", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "id": "gmail-resume-collector-v1",
+  "tags": [{ "name": "hagerstone" }, { "name": "resume-collection" }]
+}

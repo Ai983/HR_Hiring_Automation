@@ -1,0 +1,216 @@
+{
+  "name": "Hagerstone — WhatsApp Resume Collector (Maytapi)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "maytapi-resume",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "maytapi-webhook",
+      "name": "Maytapi Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "maytapi-resume",
+      "notes": "Set this webhook URL in Maytapi Dashboard → Settings → Webhook URL.\nURL will be: https://primary-production-72e3f.up.railway.app/webhook/maytapi-resume"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [480, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "has-document",
+              "leftValue": "={{ $json.body.data.type }}",
+              "rightValue": "document",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-document",
+      "name": "Filter — Document Messages Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [480, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract sender info from Maytapi webhook payload\nconst data = $input.item.json.body?.data || {};\nconst from = data.from || '';\n\n// WhatsApp number is like 919876543210@c.us — strip the @c.us\nconst phone = from.replace('@c.us', '').replace('@s.whatsapp.net', '');\n// Name from pushname or fallback to phone\nconst senderName = data.pushname || data.notifyName || `WA-${phone.slice(-4)}`;\nconst msgBody = data.text?.body || data.caption || '';\nconst msgId = data.id || '';\nconst documentData = data.message?.document || {};\nconst mediaId = documentData.id || msgId;\nconst mimeType = documentData.mimetype || 'application/pdf';\nconst filename = documentData.filename || `resume_${phone}.pdf`;\n\nreturn {\n  json: {\n    phone,\n    full_name: senderName,\n    email: `${phone}@whatsapp.noemail`,\n    msg_body: msgBody,\n    msg_id: msgId,\n    media_id: mediaId,\n    mime_type: mimeType,\n    filename\n  }\n};"
+      },
+      "id": "extract-wa-sender",
+      "name": "Extract WhatsApp Sender",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 380]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.maytapi.com/api/{{ 'b8cce1b9-0f9f-4aef-994c-d232716471f0' }}/{{ '46821' }}/getMedia",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "message_id", "value": "={{ $json.msg_id }}" },
+            { "name": "type", "value": "document" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-media",
+      "name": "Maytapi — Download Resume File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sgerslbmnwrltqrhsdir.supabase.co/storage/v1/object/resumes/whatsapp/{{ $('Extract WhatsApp Sender').item.json.phone }}_{{ $now.toFormat('yyyyMMdd_HHmmss') }}.pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Content-Type", "value": "application/pdf" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "upload-storage",
+      "name": "Supabase Storage — Upload Resume",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 380]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/jobs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "1" },
+            { "name": "select", "value": "id,title" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-latest-job-wa",
+      "name": "Supabase — Get Latest Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sender = $('Extract WhatsApp Sender').item.json;\nconst storagePath = $('Supabase Storage — Upload Resume').item.json?.Key || null;\nconst jobs = $input.item.json;\nconst job = Array.isArray(jobs) ? jobs[0] : jobs;\n\nreturn {\n  json: {\n    job_id: job?.id || null,\n    full_name: sender.full_name,\n    email: sender.email,\n    phone: sender.phone || null,\n    portal: 'whatsapp',\n    stage: 'new',\n    resume_path: storagePath,\n    screening_notes: `Via WhatsApp — ${sender.msg_body?.slice(0,200) || ''}`,\n    applied_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "build-wa-applicant",
+      "name": "Build WhatsApp Applicant Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/applicants",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "insert-wa-applicant",
+      "name": "Supabase — Insert WhatsApp Applicant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 380]
+    }
+  ],
+  "connections": {
+    "Maytapi Webhook": {
+      "main": [
+        [{ "node": "Respond 200 OK", "type": "main", "index": 0 }],
+        [{ "node": "Filter — Document Messages Only", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter — Document Messages Only": {
+      "main": [[{ "node": "Extract WhatsApp Sender", "type": "main", "index": 0 }]]
+    },
+    "Extract WhatsApp Sender": {
+      "main": [[{ "node": "Maytapi — Download Resume File", "type": "main", "index": 0 }]]
+    },
+    "Maytapi — Download Resume File": {
+      "main": [[{ "node": "Supabase Storage — Upload Resume", "type": "main", "index": 0 }]]
+    },
+    "Supabase Storage — Upload Resume": {
+      "main": [[{ "node": "Supabase — Get Latest Job", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Get Latest Job": {
+      "main": [[{ "node": "Build WhatsApp Applicant Record", "type": "main", "index": 0 }]]
+    },
+    "Build WhatsApp Applicant Record": {
+      "main": [[{ "node": "Supabase — Insert WhatsApp Applicant", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": ""
+  },
+  "id": "whatsapp-resume-collector-v1",
+  "tags": [{ "name": "hagerstone" }, { "name": "resume-collection" }, { "name": "maytapi" }]
+}

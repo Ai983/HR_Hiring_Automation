@@ -1,0 +1,98 @@
+{
+  "name": "Hagerstone — Callback Reminder (HR)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 30 }
+          ]
+        }
+      },
+      "id": "schedule-callback",
+      "name": "Schedule — Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/call_logs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "call_status", "value": "eq.callback_requested" },
+            { "name": "callback_time", "value": "={{ 'lte.' + new Date().toISOString() }}" },
+            { "name": "select", "value": "*,applicants(full_name,phone)" },
+            { "name": "order", "value": "callback_time.asc" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-callbacks",
+      "name": "Supabase — Fetch Due Callbacks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a summary WhatsApp message for HR\nconst data = $input.item.json;\nconst callbacks = Array.isArray(data) ? data : [data];\n\nif (!callbacks.length || !callbacks[0]?.id) {\n  // Nothing due — stop\n  return [];\n}\n\nconst lines = callbacks.map((c, i) => {\n  const name = c.applicants?.full_name || 'Unknown';\n  const phone = c.applicants?.phone || 'N/A';\n  const time = c.callback_time ? new Date(c.callback_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Now';\n  return `${i + 1}. ${name} — 📞 ${phone} (at ${time})`;\n});\n\nconst message = `⏰ *Callback Reminder* — ${callbacks.length} due now\\n\\n${lines.join('\\n')}\\n\\n_Please call these candidates from HireFlow._`;\n\nreturn [{ json: { message, count: callbacks.length } }];"
+      },
+      "id": "format-callback-summary",
+      "name": "Format Callback Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.maytapi.com/api/b8cce1b9-0f9f-4aef-994c-d232716471f0/46821/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to_number: $env.HR_WHATSAPP_NUMBER || '91XXXXXXXXXX', type: 'text', message: $json.message }) }}",
+        "options": {}
+      },
+      "id": "notify-hr-callbacks",
+      "name": "Maytapi — Notify HR of Callbacks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300],
+      "notes": "⚠️ Set HR_WHATSAPP_NUMBER in n8n Settings → Variables (format: 91XXXXXXXXXX)"
+    }
+  ],
+  "connections": {
+    "Schedule — Every 30 Minutes": {
+      "main": [[{ "node": "Supabase — Fetch Due Callbacks", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Fetch Due Callbacks": {
+      "main": [[{ "node": "Format Callback Summary", "type": "main", "index": 0 }]]
+    },
+    "Format Callback Summary": {
+      "main": [[{ "node": "Maytapi — Notify HR of Callbacks", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "id": "callback-reminder-v1",
+  "tags": [{ "name": "hagerstone" }, { "name": "calling" }, { "name": "reminders" }]
+}
