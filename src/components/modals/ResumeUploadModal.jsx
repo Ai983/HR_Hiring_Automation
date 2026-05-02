@@ -259,7 +259,7 @@ export default function ResumeUploadModal({ initialJobId, onClose }) {
           </div>
 
           {/* ── Entry cards ── */}
-          {entries.map((entry, idx) => (
+          {entries.map((entry) => (
             <div
               key={entry.id}
               style={{
