@@ -3,6 +3,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { STAGES, STAGE_META, SOURCE_META } from "../../constants.js";
 import { fmtDate } from "../../helpers.js";
 import { updateApplicantStage, createApplicant, uploadResumeFile, screenApplicant } from "../../services/applicantService.js";
+import { resolveJobIdForRole } from "../../services/jobService.js";
 import { extractResumeText, parseResumeInfo } from "../../services/resumeParser.js";
 import { fetchInterviews } from "../../services/interviewService.js";
 
@@ -11,13 +12,14 @@ const MODAL = { background: "#fff", borderRadius: 16, padding: 28, width: "100%"
 const PORTAL_LIST = ["manual", "linkedin", "indeed", "jobhai", "apna", "email", "whatsapp", "facebook", "instagram"];
 
 export default function Applicants() {
-  const { jobs, applicants, setApplicants, refreshApplicants, selectedJob, setSelectedJob, setModal, setPanel, showToast } = useApp();
+  const { jobs, setJobs, applicants, setApplicants, refreshApplicants, selectedJob, setSelectedJob, setModal, setPanel, showToast } = useApp();
 
   const [dragOver, setDragOver] = useState(null);
   const [dragId, setDragId]     = useState(null);
   const [interviewMap, setInterviewMap] = useState({});
   const [quickAdd, setQuickAdd] = useState(null); // null | stage string
   const [qaForm, setQaForm]     = useState({ name: "", email: "", phone: "", jobId: "", portal: "manual" });
+  const [qaCustomRole, setQaCustomRole] = useState("");
   const [qaSaving, setQaSaving] = useState(false);
   const [qaResume, setQaResume]   = useState(null);
   const [qaResumeText, setQaResumeText] = useState("");
@@ -49,6 +51,7 @@ export default function Applicants() {
   const openQuickAdd = (stage) => {
     setQuickAdd(stage);
     setQaForm({ name: "", email: "", phone: "", jobId: selectedJob || "", portal: "manual" });
+    setQaCustomRole("");
     setQaResume(null);
     setQaResumeText("");
     setQaParsing(false);
@@ -81,19 +84,27 @@ export default function Applicants() {
 
   const saveQuickAdd = async () => {
     if (!qaForm.name.trim() || !qaForm.email.trim()) return showToast("Name and email are required.", false);
+    if (qaForm.jobId === "__custom__" && !qaCustomRole.trim()) return showToast("Enter the custom job role title.", false);
     setQaSaving(true);
     try {
+      // Resolve custom role to a real job ID
+      let resolvedJobId = qaForm.jobId;
+      if (qaForm.jobId === "__custom__" && qaCustomRole.trim()) {
+        resolvedJobId = await resolveJobIdForRole(jobs, qaCustomRole.trim(), "", setJobs);
+        if (!resolvedJobId) { showToast("Could not create custom role. Try again.", false); setQaSaving(false); return; }
+      }
+
       let resumePath = null;
-      if (qaResume && qaForm.jobId) {
+      if (qaResume && resolvedJobId) {
         const ext = qaResume.name.split(".").pop() || "pdf";
-        resumePath = `${qaForm.jobId}/${crypto.randomUUID()}.${ext}`;
+        resumePath = `${resolvedJobId}/${crypto.randomUUID()}.${ext}`;
         await uploadResumeFile(resumePath, qaResume);
       }
       const newApp = await createApplicant({
         full_name: qaForm.name.trim(),
         email: qaForm.email.trim(),
         phone: qaForm.phone.trim() || null,
-        job_id: qaForm.jobId || null,
+        job_id: resolvedJobId || null,
         portal: qaForm.portal,
         stage: quickAdd,
         applied_at: new Date().toISOString(),
@@ -349,10 +360,25 @@ export default function Applicants() {
               </div>
               <div className="form-field">
                 <label className="form-label">Job Role</label>
-                <select className="form-input" value={qaForm.jobId} onChange={(e) => setQaForm((f) => ({ ...f, jobId: e.target.value }))}>
+                <select
+                  className="form-input"
+                  value={qaForm.jobId}
+                  onChange={(e) => { setQaForm((f) => ({ ...f, jobId: e.target.value })); setQaCustomRole(""); }}
+                >
                   <option value="">— No specific job —</option>
                   {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
+                  <option value="__custom__">✏ Type custom role…</option>
                 </select>
+                {qaForm.jobId === "__custom__" && (
+                  <input
+                    className="form-input"
+                    style={{ marginTop: 6 }}
+                    value={qaCustomRole}
+                    onChange={(e) => setQaCustomRole(e.target.value)}
+                    placeholder="e.g. Store Manager, Accountant…"
+                    autoFocus
+                  />
+                )}
               </div>
               <div className="form-field">
                 <label className="form-label">Source</label>
