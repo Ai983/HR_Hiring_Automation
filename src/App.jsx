@@ -9,6 +9,7 @@ import Applicants from "./components/panels/Applicants.jsx";
 import Questionnaire from "./components/panels/Questionnaire.jsx";
 import ResumeReport from "./components/panels/ResumeReport.jsx";
 import AttendanceAdmin from "./components/panels/AttendanceAdmin.jsx";
+import LeaveRequests from "./components/panels/LeaveRequests.jsx";
 import EmployeeManagement from "./components/panels/EmployeeManagement.jsx";
 import CallingQueue from "./components/panels/CallingQueue.jsx";
 import Interviews from "./components/panels/Interviews.jsx";
@@ -46,6 +47,7 @@ function AppContent() {
           {panel === "report"       && <ResumeReport />}
           {panel === "survey"        && <SurveyLeads />}
           {panel === "attendance"   && <AttendanceAdmin />}
+          {panel === "leave"        && <LeaveRequests />}
           {panel === "employees"    && <EmployeeManagement />}
         </main>
       </div>

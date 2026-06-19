@@ -5,14 +5,20 @@ import { supabase } from "../../supabaseClient.js";
 import { deleteAllJobs } from "../../services/jobService.js";
 import { deleteAllApplicants } from "../../services/applicantService.js";
 import { fetchSurveyNewCount } from "../../services/surveyService.js";
+import { fetchPendingLeaveCount } from "../../services/leaveService.js";
 
 export default function Sidebar() {
   const { panel, setPanel, jobs, applicants, setJobs, setApplicants, setSelectedJob, setModal, showToast } = useApp();
   const [surveyCount, setSurveyCount] = useState(0);
+  const [leaveCount, setLeaveCount]   = useState(0);
 
   useEffect(() => {
     fetchSurveyNewCount().then(setSurveyCount);
-    const interval = setInterval(() => fetchSurveyNewCount().then(setSurveyCount), 60000);
+    fetchPendingLeaveCount().then(setLeaveCount);
+    const interval = setInterval(() => {
+      fetchSurveyNewCount().then(setSurveyCount);
+      fetchPendingLeaveCount().then(setLeaveCount);
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -54,6 +60,7 @@ export default function Sidebar() {
     { id: "report",        icon: "☰", label: "Resume Report" },
     { id: "divider3" },
     { id: "attendance",    icon: "⏰", label: "Attendance" },
+    { id: "leave",         icon: "\u{1F334}", label: "Leave Requests", badge: leaveCount },
     { id: "employees",     icon: "▦", label: "Employees" },
   ];
 

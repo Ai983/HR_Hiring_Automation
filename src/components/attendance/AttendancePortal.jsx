@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../supabaseClient.js";
+import { createLeaveRequest, fetchPaidDaysUsedThisMonth } from "../../services/leaveService.js";
+import {
+  LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
+  countLeaveDays, splitPaidUnpaid,
+} from "../../leaveConfig.js";
 import "./AttendancePortal.css";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -183,6 +188,183 @@ function Camera({ onCapture, onCancel }) {
   );
 }
 
+// ─── LEAVE REQUEST FORM ──────────────────────────────────────────────────────
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function LeaveForm({ employee, onCancel, onSubmitted }) {
+  const [requestTo, setRequestTo] = useState("");
+  const [leaveType, setLeaveType] = useState("");
+  const [reason, setReason]       = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate]     = useState("");
+  const [usedThisMonth, setUsed]  = useState(0);
+  const [loadingBal, setLoadingBal] = useState(true);
+  const [busy, setBusy]           = useState(false);
+  const [err, setErr]             = useState("");
+
+  const isHalf = LEAVE_TYPES.find((t) => t.value === leaveType)?.isHalf;
+
+  // Load how many paid days the employee has already used this month.
+  useEffect(() => {
+    let alive = true;
+    fetchPaidDaysUsedThisMonth(employee.id)
+      .then((d) => { if (alive) { setUsed(d); setLoadingBal(false); } })
+      .catch(() => { if (alive) setLoadingBal(false); });
+    return () => { alive = false; };
+  }, [employee.id]);
+
+  // Half-day leave only spans a single date.
+  useEffect(() => {
+    if (isHalf && startDate) setEndDate(startDate);
+  }, [isHalf, startDate]);
+
+  // Live day split for the preview banner.
+  const requestedDays = countLeaveDays(startDate, isHalf ? startDate : endDate, leaveType);
+  const { paidLeft, paidDays, unpaidDays } = splitPaidUnpaid(usedThisMonth, requestedDays);
+
+  const handleSubmit = async () => {
+    setErr("");
+    if (!requestTo)              { setErr("Please choose who you're requesting leave from."); return; }
+    if (!leaveType)             { setErr("Please select a type of leave."); return; }
+    if (!startDate)             { setErr("Please pick a start date."); return; }
+    if (!isHalf && !endDate)    { setErr("Please pick an end date."); return; }
+    if (requestedDays <= 0)     { setErr("End date can't be before the start date."); return; }
+    if (!reason.trim())         { setErr("Please add a short reason for the leave."); return; }
+
+    setBusy(true);
+    try {
+      await createLeaveRequest({
+        employee_id: employee.id,
+        request_to:  requestTo,
+        leave_type:  leaveType,
+        reason,
+        start_date:  startDate,
+        end_date:    isHalf ? startDate : endDate,
+        total_days:  requestedDays,
+        paid_days:   paidDays,
+        unpaid_days: unpaidDays,
+      });
+      onSubmitted({ days: requestedDays, paidDays, unpaidDays });
+    } catch (e) {
+      setErr("Couldn't submit your request. Please try again.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="ap-shell">
+      <div className="ap-leave-head">
+        <button className="ap-logout" onClick={onCancel}>← Back</button>
+        <div className="ap-section-title">Apply for Leave</div>
+      </div>
+
+      {/* Balance banner */}
+      <div className={`ap-balance ${paidLeft > 0 ? "ok" : "none"}`}>
+        {loadingBal ? (
+          <><span className="ap-spinner-sm" /> Checking your leave balance…</>
+        ) : (
+          <>
+            <div className="ap-balance-top">
+              <span className="ap-balance-big">{paidLeft}</span>
+              <span className="ap-balance-of">of {PAID_LEAVE_PER_MONTH} paid leave days left this month</span>
+            </div>
+            <div className="ap-balance-sub">
+              {paidLeft > 0
+                ? "Paid leaves reset on the 1st of every month. Extra days are unpaid."
+                : "You've used your paid leave for this month. Further leave is unpaid (salary deducted)."}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Leave Request To */}
+      <div className="ap-form-card">
+        <label className="ap-label req">Leave Request To</label>
+        <div className="ap-radio-row">
+          {APPROVERS.map((a) => (
+            <button
+              key={a.value}
+              type="button"
+              className={`ap-radio ${requestTo === a.value ? "sel" : ""}`}
+              onClick={() => setRequestTo(a.value)}
+            >
+              <span className="ap-radio-dot" />{a.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Type of leave */}
+      <div className="ap-form-card">
+        <label className="ap-label req">Type of Leave <span className="ap-hi">(छुट्टी का प्रकार)</span></label>
+        <select className="ap-input" value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
+          <option value="">Choose…</option>
+          {LEAVE_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label} ({t.hi})</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Reason */}
+      <div className="ap-form-card">
+        <label className="ap-label req">Reason of Leave <span className="ap-hi">(छुट्टी का कारण)</span></label>
+        <textarea
+          className="ap-input"
+          rows={3}
+          placeholder="Why do you need this leave?"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
+
+      {/* Dates */}
+      <div className="ap-form-card">
+        <label className="ap-label req">{isHalf ? "Date" : "Start Date"}</label>
+        <input className="ap-input" type="date" min={todayISO()} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        {!isHalf && (
+          <>
+            <label className="ap-label req" style={{ marginTop: 12 }}>End Date</label>
+            <input className="ap-input" type="date" min={startDate || todayISO()} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </>
+        )}
+      </div>
+
+      {/* Deduction preview */}
+      {requestedDays > 0 && (
+        <div className="ap-preview">
+          <div className="ap-preview-row">
+            <span>This request</span>
+            <strong>{requestedDays} {requestedDays === 1 ? "day" : "days"}</strong>
+          </div>
+          <div className="ap-preview-row paid">
+            <span>✅ Paid</span>
+            <strong>{paidDays} {paidDays === 1 ? "day" : "days"}</strong>
+          </div>
+          {unpaidDays > 0 && (
+            <div className="ap-preview-row unpaid">
+              <span>⚠️ Salary deducted</span>
+              <strong>{unpaidDays} {unpaidDays === 1 ? "day" : "days"}</strong>
+            </div>
+          )}
+        </div>
+      )}
+
+      {err && <div className="ap-error">{err}</div>}
+
+      <button className="ap-btn-action checkin" onClick={handleSubmit} disabled={busy || loadingBal}>
+        {busy ? <><span className="ap-spinner" /> Submitting…</> : "Submit Leave Request"}
+      </button>
+
+      <p className="ap-footer-note">
+        Your request goes to HR for approval. You'll be informed once it's reviewed.
+      </p>
+    </div>
+  );
+}
+
 // ─── MAIN PORTAL ─────────────────────────────────────────────────────────────
 
 export default function AttendancePortal() {
@@ -197,6 +379,8 @@ export default function AttendancePortal() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(null);    // { type, time }
   const [error, setError]           = useState("");
+  const [showLeave, setShowLeave]   = useState(false);   // leave form open?
+  const [leaveDone, setLeaveDone]   = useState(null);    // { days, paidDays, unpaidDays }
 
   // Live clock
   useEffect(() => {
@@ -321,6 +505,40 @@ export default function AttendancePortal() {
     );
   }
 
+  // ── LEAVE SUCCESS FLASH ──
+  if (leaveDone) {
+    return (
+      <div className="ap-shell">
+        <div className="ap-success fade-in">
+          <div className="ap-success-icon">📨</div>
+          <h2>Leave Requested!</h2>
+          <p className="ap-success-time">
+            {leaveDone.days} {leaveDone.days === 1 ? "day" : "days"}
+          </p>
+          <p className="ap-success-addr">
+            {leaveDone.paidDays} paid
+            {leaveDone.unpaidDays > 0 ? ` · ${leaveDone.unpaidDays} unpaid (salary deducted)` : ""}.
+            <br />Sent to HR for approval.
+          </p>
+          <button className="ap-btn-primary" style={{ marginTop: 24 }} onClick={() => setLeaveDone(null)}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LEAVE FORM ──
+  if (showLeave) {
+    return (
+      <LeaveForm
+        employee={employee}
+        onCancel={() => setShowLeave(false)}
+        onSubmitted={(info) => { setShowLeave(false); setLeaveDone(info); }}
+      />
+    );
+  }
+
   // ── MAIN ATTENDANCE SCREEN ──
   const allDone = checkedInAt && checkedOutAt;
 
@@ -333,7 +551,7 @@ export default function AttendancePortal() {
           <div className="ap-emp-name">{employee.full_name}</div>
           <div className="ap-emp-meta">{employee.designation || employee.department || "Employee"} · {employee.employee_code}</div>
         </div>
-        <button className="ap-logout" onClick={() => { setEmployee(null); setLocation(null); setTodayRec([]); setSelfie(null); }}>
+        <button className="ap-logout" onClick={() => { setEmployee(null); setLocation(null); setTodayRec([]); setSelfie(null); setShowLeave(false); setLeaveDone(null); }}>
           Sign out
         </button>
       </div>
@@ -414,6 +632,16 @@ export default function AttendancePortal() {
               : "🏁 Check Out"}
         </button>
       )}
+
+      {/* Leave request box — second action in the portal */}
+      <div className="ap-leave-box" onClick={() => setShowLeave(true)}>
+        <div className="ap-leave-box-icon">🌴</div>
+        <div className="ap-leave-box-body">
+          <div className="ap-leave-box-title">Apply for Leave</div>
+          <div className="ap-leave-box-sub">Casual · Half Day · Emergency · Sick</div>
+        </div>
+        <div className="ap-leave-box-arrow">→</div>
+      </div>
 
       <p className="ap-footer-note">
         Your attendance is recorded automatically with timestamp and location.<br />
