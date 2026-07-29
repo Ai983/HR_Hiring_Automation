@@ -89,8 +89,3 @@ export async function checkDuplicate(email, phone) {
   return data?.[0] || null;
 }
 
-export async function deleteAllApplicants() {
-  if (!supabase) return;
-  const zero = "00000000-0000-0000-0000-000000000000";
-  await supabase.from("applicants").delete().or(`id.eq.${zero},id.neq.${zero}`);
-}

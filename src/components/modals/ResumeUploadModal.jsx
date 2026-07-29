@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { PORTALS, JOB_ROLES } from "../../constants.js";
 import { supabase, supabaseUrl, supabaseAnon } from "../../supabaseClient.js";
-import { createApplicant, uploadResumeFile, screenApplicant } from "../../services/applicantService.js";
+import { createApplicant, uploadResumeFile, screenApplicant, checkDuplicate } from "../../services/applicantService.js";
 import { resolveJobIdForRole } from "../../services/jobService.js";
 import { extractResumeText, parseResumeInfo } from "../../services/resumeParser.js";
 
@@ -94,6 +94,11 @@ export default function ResumeUploadModal({ initialJobId, onClose }) {
         updateEntry(entry.id, { status: "uploading" });
 
         try {
+          const dupe = await checkDuplicate(entry.email.trim(), entry.phone?.trim() || "");
+          if (dupe) {
+            updateEntry(entry.id, { status: "error", error: `Duplicate — already in pipeline (${dupe.stage})` });
+            continue;
+          }
           const ext = entry.file.name.split(".").pop() || "pdf";
           const path = `${jobId}/${crypto.randomUUID()}.${ext}`;
 

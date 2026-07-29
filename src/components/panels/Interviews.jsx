@@ -3,6 +3,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { STAGE_META } from "../../constants.js";
 import { fetchInterviews, createInterview, updateInterview, submitFeedback } from "../../services/interviewService.js";
 import { updateApplicantStage } from "../../services/applicantService.js";
+import { localInputToISO } from "../../helpers.js";
 
 const OVERLAY = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
 const MODAL = { background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 540, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" };
@@ -35,6 +36,8 @@ export default function Interviews() {
     try {
       await createInterview({
         applicant_id: schedModal.id, ...schedForm,
+        // the picker gives a naive local time — send a real UTC instant
+        scheduled_at: localInputToISO(schedForm.scheduled_at),
         panel: schedForm.panel ? schedForm.panel.split(",").map((s) => s.trim()) : [],
       });
       // ensure applicant is in interview stage & sync kanban

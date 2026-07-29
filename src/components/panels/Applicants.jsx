@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { STAGES, STAGE_META, SOURCE_META } from "../../constants.js";
 import { fmtDate } from "../../helpers.js";
-import { updateApplicantStage, createApplicant, uploadResumeFile, screenApplicant } from "../../services/applicantService.js";
+import { updateApplicantStage, createApplicant, uploadResumeFile, screenApplicant, checkDuplicate } from "../../services/applicantService.js";
 import { resolveJobIdForRole } from "../../services/jobService.js";
 import { extractResumeText, parseResumeInfo } from "../../services/resumeParser.js";
 import { fetchInterviews } from "../../services/interviewService.js";
@@ -84,9 +84,16 @@ export default function Applicants() {
 
   const saveQuickAdd = async () => {
     if (!qaForm.name.trim() || !qaForm.email.trim()) return showToast("Name and email are required.", false);
+    // applicants.job_id is NOT NULL — without this guard the insert dies with a raw Postgres error.
+    if (!qaForm.jobId) return showToast("Pick a job role — an applicant must be attached to a role.", false);
     if (qaForm.jobId === "__custom__" && !qaCustomRole.trim()) return showToast("Enter the custom job role title.", false);
     setQaSaving(true);
     try {
+      const dupe = await checkDuplicate(qaForm.email.trim(), qaForm.phone.trim());
+      if (dupe) {
+        setQaSaving(false);
+        return showToast(`Already in the pipeline: ${dupe.full_name} (${dupe.stage}).`, false);
+      }
       // Resolve custom role to a real job ID
       let resolvedJobId = qaForm.jobId;
       if (qaForm.jobId === "__custom__" && qaCustomRole.trim()) {
@@ -359,13 +366,13 @@ export default function Applicants() {
                 />
               </div>
               <div className="form-field">
-                <label className="form-label">Job Role</label>
+                <label className="form-label">Job Role *</label>
                 <select
                   className="form-input"
                   value={qaForm.jobId}
                   onChange={(e) => { setQaForm((f) => ({ ...f, jobId: e.target.value })); setQaCustomRole(""); }}
                 >
-                  <option value="">— No specific job —</option>
+                  <option value="">— Select a role —</option>
                   {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
                   <option value="__custom__">✏ Type custom role…</option>
                 </select>

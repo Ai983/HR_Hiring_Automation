@@ -28,11 +28,6 @@ export async function updatePortalStatus(jobId, portalStatus) {
   await supabase.from("jobs").update({ portal_status: portalStatus }).eq("id", jobId);
 }
 
-export async function deleteAllJobs() {
-  if (!supabase) return;
-  const zero = "00000000-0000-0000-0000-000000000000";
-  await supabase.from("jobs").delete().or(`id.eq.${zero},id.neq.${zero}`);
-}
 
 /** Find job id by title, or create a new job with that title (and optional jd). Returns id. */
 export async function resolveJobIdForRole(jobs, title, jdText, setJobs) {

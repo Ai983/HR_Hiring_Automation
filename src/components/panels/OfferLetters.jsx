@@ -45,12 +45,13 @@ export default function OfferLetters() {
     setSaving(true);
     try {
       await createOffer({ applicant_id: createModal.id, job_id: createModal.jobId, ctc_gross_annual: gross, joining_date: joiningDate, probation_months: probation });
-      await updateApplicantStage(createModal.id, "hired");
+      // Stay in "offer" until the candidate actually accepts — marking them Hired
+      // on offer creation misreports the pipeline and inflates the Hired count.
       await refreshApplicants();
       await load();
       setCreateModal(null);
       setPreview(null);
-      showToast("Offer created. Candidate moved to Hired.");
+      showToast("Offer created. Candidate stays in Offer until they accept.");
     } catch (e) { showToast(e.message, false); }
     setSaving(false);
   }
@@ -58,7 +59,10 @@ export default function OfferLetters() {
   async function updateStatus(offer, status) {
     await updateOffer(offer.id, { offer_status: status });
     if (status === "accepted") {
-      await updateApplicantStage(offer.applicant_id, "onboarding");
+      await updateApplicantStage(offer.applicant_id, "hired");
+      await refreshApplicants();
+    } else if (status === "declined") {
+      await updateApplicantStage(offer.applicant_id, "rejected");
       await refreshApplicants();
     }
     await load();

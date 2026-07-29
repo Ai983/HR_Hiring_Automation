@@ -4,7 +4,7 @@ import { SEED_JOBS, SEED_APPLICANTS } from "../constants.js";
 import { useToast } from "../hooks/useToast.js";
 import { fetchJobs } from "../services/jobService.js";
 import { fetchApplicants } from "../services/applicantService.js";
-import { getSession, onAuthChange, fetchContext, signIn, signOut } from "../services/authService.js";
+import { onAuthChange, fetchContext, signIn, signOut } from "../services/authService.js";
 
 const AppContext = createContext(null);
 

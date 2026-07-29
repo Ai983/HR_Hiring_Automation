@@ -68,6 +68,33 @@ Deno.serve(async (req) => {
 
     const now = new Date();
 
+    // ── 1b. Reject a punch that repeats today's last one ──
+    // A double tap, a stale tab, or a retry after a slow network must not create
+    // two check-ins. The portal hides the button, but the server is the guard.
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+    istNow.setUTCHours(0, 0, 0, 0);                       // 00:00 on today's IST date
+    const dayStart = new Date(istNow.getTime() - IST_OFFSET_MS); // back to a UTC instant
+    const { data: todays } = await supabase
+      .from("attendance")
+      .select("type, recorded_at")
+      .eq("employee_id", emp.id)
+      .gte("recorded_at", dayStart.toISOString())
+      .order("recorded_at", { ascending: false })
+      .limit(1);
+    const lastType = todays?.[0]?.type ?? null;
+    if (lastType === type) {
+      return json({
+        error: type === "check_in"
+          ? "You have already checked in today."
+          : "You have already checked out.",
+        duplicate: true,
+      }, 409);
+    }
+    if (type === "check_out" && lastType === null) {
+      return json({ error: "Please check in before checking out.", duplicate: false }, 409);
+    }
+
     // ── 2. Geofence enforcement — only for tracked employees ──
     let geo = null;
     if (track_location) {

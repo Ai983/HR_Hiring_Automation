@@ -4,6 +4,7 @@ import { STAGE_META } from "../../constants.js";
 import { fetchCallQueue, fetchCallLogs, createCallLog, countCallAttempts } from "../../services/callService.js";
 import { updateApplicantStage } from "../../services/applicantService.js";
 import { generateCallPrep } from "../../services/aiService.js";
+import { localInputToISO } from "../../helpers.js";
 
 const OUTCOME_LABELS = {
   connected:          "Connected",
@@ -65,7 +66,7 @@ export default function CallingQueue() {
     if (!form.called_by.trim()) return showToast("Enter caller name.", false);
     setSaving(true);
     try {
-      await createCallLog({ applicant_id: modalApp.id, ...form, callback_time: form.callback_time || null });
+      await createCallLog({ applicant_id: modalApp.id, ...form, callback_time: localInputToISO(form.callback_time) });
       if (form.call_status === "moved_to_interview") {
         await updateApplicantStage(modalApp.id, "interview");
       } else if (form.call_status === "rejected_on_call") {

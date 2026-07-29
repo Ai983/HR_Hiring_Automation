@@ -113,19 +113,17 @@ Generate the ${typeLabel} questionnaire now.`;
       );
     }
 
-    try {
-      await supabase.from("questionnaires").insert({
-        job_id,
-        interview_type,
-        custom_topics: custom_topics || null,
-        sections: parsed.sections || [],
-      });
-    } catch {
-      // Non-fatal
-    }
+    // supabase-js returns { error } rather than throwing, so a try/catch here
+    // silently loses the row. Surface it to the caller instead.
+    const { error: saveErr } = await supabase.from("questionnaires").insert({
+      job_id,
+      interview_type,
+      custom_topics: custom_topics || null,
+      sections: parsed.sections || [],
+    });
 
     return new Response(
-      JSON.stringify(parsed),
+      JSON.stringify({ ...parsed, saved: !saveErr, save_error: saveErr?.message ?? null }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -2,14 +2,12 @@ import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { PORTALS } from "../../constants.js";
 import { supabase } from "../../supabaseClient.js";
-import { deleteAllJobs } from "../../services/jobService.js";
-import { deleteAllApplicants } from "../../services/applicantService.js";
 import { fetchSurveyNewCount } from "../../services/surveyService.js";
 import { fetchPendingLeaveCount } from "../../services/leaveService.js";
 import SyncStatus from "./SyncStatus.jsx";
 
 export default function Sidebar() {
-  const { panel, setPanel, jobs, applicants, setJobs, setApplicants, setSelectedJob, setModal, showToast, ctx, hasModule, logout } = useApp();
+  const { panel, setPanel, jobs, applicants, setSelectedJob, ctx, hasModule, logout } = useApp();
   const [surveyCount, setSurveyCount] = useState(0);
   const [leaveCount, setLeaveCount]   = useState(0);
 
@@ -31,17 +29,6 @@ export default function Sidebar() {
   const references  = applicants.filter((a) => a.stage === "reference").length;
   const offers      = applicants.filter((a) => a.stage === "offer").length;
   const onboardings = applicants.filter((a) => a.stage === "hired" || a.stage === "onboarding").length;
-
-  const clearAllData = async () => {
-    if (!window.confirm("Clear all jobs and applicants? This cannot be undone.")) return;
-    await deleteAllApplicants();
-    await deleteAllJobs();
-    setJobs([]);
-    setApplicants([]);
-    setSelectedJob(null);
-    setModal(null);
-    showToast("All data cleared. You can test from scratch.");
-  };
 
   const topItem = { id: "dashboard", icon: "⬛", label: "Dashboard" };
 

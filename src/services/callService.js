@@ -4,8 +4,9 @@ export async function fetchCallQueue() {
   if (!supabase) return [];
   const { data } = await supabase
     .from("applicants")
-    .select("*, jobs(title, jd)")
+    .select("*, jobs(title, jd), call_logs(id, call_status, call_date)")
     .in("stage", ["calling"])
+    .order("call_date", { referencedTable: "call_logs", ascending: false })
     .order("ai_score", { ascending: false });
   return data || [];
 }

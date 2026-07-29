@@ -99,7 +99,7 @@ function LoginScreen({ onLogin }) {
       const ctx = await fetchContext();
       if (!ctx) { setErr("Your login isn't linked to an employee record. Contact HR."); await signOut(); setBusy(false); return; }
       if (!ctx.modules?.includes("attendance")) { setErr("You don't have attendance access. Contact HR."); await signOut(); setBusy(false); return; }
-      onLogin({ id: ctx.employee_id, employee_code: ctx.employee_code, full_name: ctx.name, track_location: ctx.track_location });
+      onLogin({ id: ctx.employee_id, employee_code: ctx.employee_code, full_name: ctx.name, role: ctx.role, track_location: ctx.track_location });
     } catch (ex) {
       setErr(ex?.message?.includes("Invalid") ? "Invalid email or password." : (ex?.message || "Sign in failed."));
       setBusy(false);
@@ -447,7 +447,7 @@ export default function AttendancePortal() {
       if (!sess || !alive) return;
       const c = await fetchContext();
       if (!c || !alive || !c.modules?.includes("attendance")) return;
-      handleLogin({ id: c.employee_id, employee_code: c.employee_code, full_name: c.name, track_location: c.track_location });
+      handleLogin({ id: c.employee_id, employee_code: c.employee_code, full_name: c.name, role: c.role, track_location: c.track_location });
     })();
     return () => { alive = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -652,10 +652,10 @@ export default function AttendancePortal() {
     <div className="ap-shell">
       {/* Header */}
       <div className="ap-header">
-        <div className="ap-avatar">{employee.full_name[0].toUpperCase()}</div>
+        <div className="ap-avatar">{(employee.full_name || "?").charAt(0).toUpperCase()}</div>
         <div className="ap-header-info">
-          <div className="ap-emp-name">{employee.full_name}</div>
-          <div className="ap-emp-meta">{employee.designation || employee.department || "Employee"} · {employee.employee_code}</div>
+          <div className="ap-emp-name">{employee.full_name || "Employee"}</div>
+          <div className="ap-emp-meta">{employee.role || "Employee"} · {employee.employee_code}</div>
         </div>
         <button className="ap-logout" onClick={async () => { await signOut(); setEmployee(null); setLocation(null); setGeofences([]); setTodayRec([]); setSelfie(null); setShowLeave(false); setLeaveDone(null); }}>
           Sign out

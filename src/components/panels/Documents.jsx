@@ -36,7 +36,9 @@ export default function Documents() {
   }
 
   async function cycleStatus(doc) {
-    const cycle = { pending: "not_applicable", submitted: "verified", verified: "pending", rejected: "pending", not_applicable: "pending" };
+    // Full loop — every state must be reachable from `pending`, otherwise HR can
+    // never mark a document submitted or verified.
+    const cycle = { pending: "submitted", submitted: "verified", verified: "rejected", rejected: "not_applicable", not_applicable: "pending" };
     const next = cycle[doc.status] || "pending";
     setUpdating(doc.id);
     try {
@@ -110,7 +112,7 @@ export default function Documents() {
                       </div>
                     )}
                     <div style={{ marginTop: 10, fontSize: 11, color: "#8a7e72" }}>
-                      Click a document to cycle: pending → not applicable → submitted → verified → pending
+                      Click a document to cycle: pending → submitted → verified → rejected → not applicable → pending
                     </div>
                   </div>
                 )}
