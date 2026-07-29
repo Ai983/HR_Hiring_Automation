@@ -8,7 +8,7 @@ serve(async (req) => {
 
   try {
     const { interview_id } = await req.json();
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { db: { schema: "hr" } });
 
     const { data: interview, error } = await supabase
       .from("interviews")
