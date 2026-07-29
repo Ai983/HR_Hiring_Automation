@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../supabaseClient.js";
+import { signIn, signOut, getSession, fetchContext } from "../../services/authService.js";
 import { createLeaveRequest, fetchPaidDaysUsedThisMonth } from "../../services/leaveService.js";
+import { fetchGeofences, insertPing } from "../../services/locationService.js";
+import { evaluateGeofence, pillState } from "../../lib/geofence.js";
 import {
   LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
   countLeaveDays, splitPaidUnpaid,
@@ -19,6 +22,36 @@ function todayRange() {
   const s = new Date(); s.setHours(0, 0, 0, 0);
   const e = new Date(); e.setHours(23, 59, 59, 999);
   return { start: s.toISOString(), end: e.toISOString() };
+}
+
+// Acquire the MOST ACCURATE GPS fix within a time window. Phones return a
+// coarse network fix first (±500–2000m) then refine to a real lock (±5–20m);
+// taking the first fix is why on-site staff saw "outside". So we watch, keep
+// the best reading, resolve early at ≤desiredAccuracy, and always clean up.
+function getBestPosition({ maxWaitMs = 15000, desiredAccuracy = 40 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error("no-geolocation")); return; }
+    let best = null;
+    let done = false;
+    let id = null;
+    const finish = (val, err) => {
+      if (done) return;
+      done = true;
+      if (id != null) navigator.geolocation.clearWatch(id);
+      clearTimeout(timer);
+      if (val) resolve(val); else reject(err || new Error("timeout"));
+    };
+    id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const c = pos.coords;
+        if (!best || c.accuracy < best.accuracy) best = { lat: c.latitude, lng: c.longitude, accuracy: c.accuracy };
+        if (best.accuracy <= desiredAccuracy) finish(best);
+      },
+      (e) => { if (!best) finish(null, e); },
+      { enableHighAccuracy: true, timeout: maxWaitMs, maximumAge: 0 }
+    );
+    const timer = setTimeout(() => finish(best), maxWaitMs);
+  });
 }
 
 async function reverseGeocode(lat, lng) {
@@ -51,28 +84,24 @@ async function uploadSelfie(base64, employeeCode) {
 // ─── LOGIN SCREEN ────────────────────────────────────────────────────────────
 
 function LoginScreen({ onLogin }) {
-  const [code, setCode]   = useState("");
-  const [pin, setPin]     = useState("");
-  const [err, setErr]     = useState("");
-  const [busy, setBusy]   = useState(false);
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr]           = useState("");
+  const [busy, setBusy]         = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!code.trim() || !pin.trim()) { setErr("Enter your Employee ID and PIN."); return; }
+    if (!email.trim() || !password) { setErr("Enter your email and password."); return; }
     setBusy(true); setErr("");
     try {
-      if (!supabase) { setErr("Database not connected. Check Supabase config."); setBusy(false); return; }
-      const { data, error } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("employee_code", code.trim().toUpperCase())
-        .eq("pin", pin.trim())
-        .eq("is_active", true)
-        .single();
-      if (error || !data) { setErr("Invalid Employee ID or PIN. Contact HR if you need help."); setBusy(false); return; }
-      onLogin(data);
-    } catch {
-      setErr("Something went wrong. Please try again.");
+      if (!supabase) { setErr("Not connected. Check configuration."); setBusy(false); return; }
+      await signIn(email, password);
+      const ctx = await fetchContext();
+      if (!ctx) { setErr("Your login isn't linked to an employee record. Contact HR."); await signOut(); setBusy(false); return; }
+      if (!ctx.modules?.includes("attendance")) { setErr("You don't have attendance access. Contact HR."); await signOut(); setBusy(false); return; }
+      onLogin({ id: ctx.employee_id, employee_code: ctx.employee_code, full_name: ctx.name, track_location: ctx.track_location });
+    } catch (ex) {
+      setErr(ex?.message?.includes("Invalid") ? "Invalid email or password." : (ex?.message || "Sign in failed."));
       setBusy(false);
     }
   };
@@ -91,40 +120,26 @@ function LoginScreen({ onLogin }) {
         <h2 className="ap-form-title">Sign In</h2>
 
         <div className="ap-field">
-          <label className="ap-label">Employee ID</label>
-          <input
-            className="ap-input"
-            placeholder="e.g. EMP001"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            autoComplete="username"
-            autoFocus
-          />
+          <label className="ap-label">Email</label>
+          <input className="ap-input" type="email" placeholder="you@hagerstone.com" value={email}
+            onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus />
         </div>
 
         <div className="ap-field">
-          <label className="ap-label">PIN</label>
-          <input
-            className="ap-input"
-            type="password"
-            placeholder="Enter your PIN"
-            inputMode="numeric"
-            maxLength={6}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-            autoComplete="current-password"
-          />
+          <label className="ap-label">Password</label>
+          <input className="ap-input" type="password" placeholder="Your Hagerstone Hub password" value={password}
+            onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </div>
 
         {err && <div className="ap-error">{err}</div>}
 
         <button className="ap-btn-primary" type="submit" disabled={busy}>
           {busy ? <span className="ap-spinner" /> : null}
-          {busy ? "Verifying…" : "Continue"}
+          {busy ? "Signing in…" : "Continue"}
         </button>
       </form>
 
-      <p className="ap-help">Forgot your PIN? Contact HR at <strong>hr@hagerstone.com</strong></p>
+      <p className="ap-help">Use your Hagerstone Hub login. Trouble? Contact <strong>hr@hagerstone.com</strong></p>
     </div>
   );
 }
@@ -370,9 +385,10 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
 export default function AttendancePortal() {
   const [employee, setEmployee]     = useState(null);
   const [now, setNow]               = useState(new Date());
-  const [location, setLocation]     = useState(null);   // { lat, lng, address }
+  const [location, setLocation]     = useState(null);   // { lat, lng, accuracy, address }
   const [locErr, setLocErr]         = useState("");
   const [locLoading, setLocLoading] = useState(false);
+  const [geofences, setGeofences]   = useState([]);      // active sites for the status pill / pings
   const [todayRec, setTodayRec]     = useState([]);      // today's records for this employee
   const [showCamera, setShowCamera] = useState(false);
   const [selfie, setSelfie]         = useState(null);    // base64 captured image
@@ -388,21 +404,17 @@ export default function AttendancePortal() {
     return () => clearInterval(t);
   }, []);
 
-  // Geolocation on login
+  // Geolocation on login — best-fix (watches briefly, keeps most accurate).
   const fetchLocation = useCallback(() => {
     if (!navigator.geolocation) { setLocErr("Geolocation not supported by your browser."); return; }
-    setLocLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const address = await reverseGeocode(lat, lng);
-        setLocation({ lat, lng, address });
+    setLocLoading(true); setLocErr("");
+    getBestPosition()
+      .then(async (fix) => {
+        const address = await reverseGeocode(fix.lat, fix.lng);
+        setLocation({ lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy, address });
         setLocLoading(false);
-      },
-      (e) => { setLocErr("Location access denied. Allow location and try again."); setLocLoading(false); },
-      { enableHighAccuracy: true, timeout: 12000 }
-    );
+      })
+      .catch(() => { setLocErr("Location access denied. Allow location and try again."); setLocLoading(false); });
   }, []);
 
   // Load today's records
@@ -423,53 +435,146 @@ export default function AttendancePortal() {
     setEmployee(emp);
     fetchLocation();
     loadTodayRecords(emp);
+    fetchGeofences({ activeOnly: true }).then(setGeofences).catch(() => {});
   };
+
+  // Auto-resume an existing Hagerstone Hub session (no re-login each visit).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase) return;
+      const sess = await getSession();
+      if (!sess || !alive) return;
+      const c = await fetchContext();
+      if (!c || !alive || !c.modules?.includes("attendance")) return;
+      handleLogin({ id: c.employee_id, employee_code: c.employee_code, full_name: c.name, track_location: c.track_location });
+    })();
+    return () => { alive = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Determine next action
   const lastRecord   = todayRec[todayRec.length - 1];
   const nextAction   = !lastRecord || lastRecord.type === "check_out" ? "check_in" : "check_out";
   const checkedInAt  = todayRec.find((r) => r.type === "check_in");
   const checkedOutAt = todayRec.find((r) => r.type === "check_out");
+  const dayClosed    = !!checkedInAt && !!checkedOutAt;
+
+  // ── Continuous 30s ping loop (tracked employees only, until day closes) ──
+  useEffect(() => {
+    if (!employee || !employee.track_location || dayClosed) return;
+    let alive = true;
+
+    const ping = async () => {
+      try {
+        const fix = await getBestPosition({ maxWaitMs: 12000, desiredAccuracy: 50 });
+        const geo = evaluateGeofence(fix.lat, fix.lng, fix.accuracy, geofences);
+        const site_name = geo.decision === "inside" ? geo.matchedSite : "Outside";
+        if (alive) await insertPing({ employee_id: employee.id, latitude: fix.lat, longitude: fix.lng, accuracy: fix.accuracy, site_name });
+      } catch {
+        // "online but GPS off" heartbeat so admin sees red, not absent.
+        if (alive) await insertPing({ employee_id: employee.id, latitude: null, longitude: null, accuracy: null, site_name: "GPS_OFF" }).catch(() => {});
+      }
+    };
+
+    ping();
+    const iv = setInterval(ping, 30000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [employee, geofences, dayClosed]);
+
+  // Live status pill mirrors the server rule (display only).
+  const geoNow = employee?.track_location && location
+    ? evaluateGeofence(location.lat, location.lng, location.accuracy, geofences)
+    : null;
+  const pill = employee?.track_location
+    ? pillState(location ? (geoNow ? geoNow.decision : "locating") : "locating")
+    : null;
 
   const handleSelfieCapture = (dataUrl) => {
     setSelfie(dataUrl);
     setShowCamera(false);
   };
 
+  // Fallback used only when the attendance-punch Edge Function isn't deployed.
+  // Writes directly to the table; the geofence check is client-side, so the row
+  // is always flagged location_verified=false for admin review.
+  const directInsertFallback = async (ts, selfieUrl) => {
+    const geo = employee.track_location && location
+      ? evaluateGeofence(location.lat, location.lng, location.accuracy, geofences)
+      : null;
+
+    let status = "present";
+    if (nextAction === "check_in") {
+      const cutoff = new Date(ts); cutoff.setHours(9, 30, 0, 0);
+      if (ts > cutoff) status = "late";
+    }
+
+    const record = {
+      employee_id: employee.id,
+      type:        nextAction,
+      recorded_at: ts.toISOString(),
+      latitude:    location?.lat ?? null,
+      longitude:   location?.lng ?? null,
+      accuracy:    location?.accuracy ?? null,
+      address:     location?.address ?? null,
+      selfie_url:  selfieUrl,
+      status,
+      site_name:   geo ? (geo.matchedSite ?? "Outside") : null,
+      location_verified: geo ? false : true,   // client-side check is never "verified"
+    };
+
+    const { error: dbErr } = await supabase.from("attendance").insert(record);
+    if (dbErr) throw new Error("Failed to save attendance. Please try again.");
+    return { location_verified: record.location_verified };
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true); setError("");
     try {
       const ts = new Date();
-      // Determine status
-      let status = "present";
-      if (nextAction === "check_in") {
-        const cutoff = new Date(ts); cutoff.setHours(9, 30, 0, 0);
-        if (ts > cutoff) status = "late";
-      }
 
-      // Upload selfie if captured
+      // Upload selfie if captured (still client-side to the public bucket).
       let selfieUrl = null;
       if (selfie) selfieUrl = await uploadSelfie(selfie, employee.employee_code);
 
-      const record = {
-        employee_id: employee.id,
-        type:        nextAction,
-        recorded_at: ts.toISOString(),
-        latitude:    location?.lat ?? null,
-        longitude:   location?.lng ?? null,
-        address:     location?.address ?? null,
-        selfie_url:  selfieUrl,
-        status,
-      };
+      // Punch goes through the Edge Function — it re-verifies the PIN and runs
+      // the server-authoritative geofence decision (client can't forge "inside").
+      const { data, error: fnErr } = await supabase.functions.invoke("attendance-punch", {
+        body: {
+          type:       nextAction,
+          latitude:   location?.lat ?? null,
+          longitude:  location?.lng ?? null,
+          accuracy:   location?.accuracy ?? null,
+          address:    location?.address ?? null,
+          selfie_url: selfieUrl,
+        },
+      });
 
-      const { error: dbErr } = await supabase.from("attendance").insert(record);
-      if (dbErr) throw dbErr;
+      let result = data;
 
-      setSubmitted({ type: nextAction, time: ts });
+      if (fnErr) {
+        // Did the function actually run and reject us (e.g. "you are 800m from
+        // site")? Then it's a real business rejection — surface it and stop.
+        let businessError = null;
+        try { const ctx = await fnErr.context?.json?.(); if (ctx?.error) businessError = ctx.error; } catch { /* not a JSON response */ }
+        if (businessError) throw new Error(businessError);
+
+        // Otherwise the function is unreachable (not deployed yet / network).
+        // Fall back to a direct insert so attendance never breaks. Geofence is
+        // evaluated client-side here, so the row is recorded UNVERIFIED.
+        result = await directInsertFallback(ts, selfieUrl);
+      } else if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setSubmitted({
+        type: nextAction,
+        time: ts,
+        note: result?.location_verified === false ? "Location unconfirmed — recorded and flagged for review." : null,
+      });
       setSelfie(null);
       await loadTodayRecords(employee);
     } catch (e) {
-      setError("Failed to save attendance. Please try again.");
+      setError(e.message || "Failed to save attendance. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -487,6 +592,7 @@ export default function AttendancePortal() {
           <h2>{submitted.type === "check_in" ? "Checked In!" : "Checked Out!"}</h2>
           <p className="ap-success-time">{fmtTime(submitted.time)}</p>
           {location && <p className="ap-success-addr">{location.address}</p>}
+          {submitted.note && <p className="ap-success-addr" style={{ color: "#b45309" }}>⚠️ {submitted.note}</p>}
           <button className="ap-btn-primary" style={{ marginTop: 24 }} onClick={() => setSubmitted(null)}>
             Done
           </button>
@@ -551,7 +657,7 @@ export default function AttendancePortal() {
           <div className="ap-emp-name">{employee.full_name}</div>
           <div className="ap-emp-meta">{employee.designation || employee.department || "Employee"} · {employee.employee_code}</div>
         </div>
-        <button className="ap-logout" onClick={() => { setEmployee(null); setLocation(null); setTodayRec([]); setSelfie(null); setShowLeave(false); setLeaveDone(null); }}>
+        <button className="ap-logout" onClick={async () => { await signOut(); setEmployee(null); setLocation(null); setGeofences([]); setTodayRec([]); setSelfie(null); setShowLeave(false); setLeaveDone(null); }}>
           Sign out
         </button>
       </div>
@@ -566,7 +672,14 @@ export default function AttendancePortal() {
       <div className="ap-info-card">
         <div className="ap-info-icon">📍</div>
         <div className="ap-info-body">
-          <div className="ap-info-label">Location</div>
+          <div className="ap-info-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            Location
+            {pill && (
+              <span style={{ padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 700, color: pill.color, background: pill.bg }}>
+                {pill.label}{location?.accuracy ? ` · ±${Math.round(location.accuracy)}m` : ""}
+              </span>
+            )}
+          </div>
           {locLoading && <div className="ap-info-val muted"><span className="ap-spinner-sm" /> Detecting…</div>}
           {!locLoading && locErr && (
             <div className="ap-info-val warn">

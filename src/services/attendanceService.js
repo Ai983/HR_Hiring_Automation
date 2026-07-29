@@ -11,51 +11,32 @@ export async function fetchEmployees() {
   return data || [];
 }
 
-export async function createEmployee(emp) {
+// ── HR-specific fields live in hr.employee_profile (1:1 with the shared
+//    public.employees master). The `employees` relation is a READ-ONLY view,
+//    so every employee write goes to employee_profile instead. ──
+async function upsertEmployeeProfile(employeeId, fields) {
   const { data, error } = await supabase
-    .from("employees")
-    .insert({
-      employee_code: emp.employee_code.toUpperCase().trim(),
-      full_name:     emp.full_name.trim(),
-      email:         emp.email?.trim() || null,
-      phone:         emp.phone?.trim() || null,
-      department:    emp.department?.trim() || null,
-      designation:   emp.designation?.trim() || null,
-      pin:           emp.pin.trim(),
-      is_active:     true,
-    })
+    .from("employee_profile")
+    .upsert(
+      { employee_id: employeeId, ...fields, updated_at: new Date().toISOString() },
+      { onConflict: "employee_id" }
+    )
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function updateEmployee(id, updates) {
-  const patch = { updated_at: new Date().toISOString() };
-  if (updates.full_name  !== undefined) patch.full_name  = updates.full_name.trim();
-  if (updates.email      !== undefined) patch.email      = updates.email?.trim() || null;
-  if (updates.phone      !== undefined) patch.phone      = updates.phone?.trim() || null;
-  if (updates.department !== undefined) patch.department = updates.department?.trim() || null;
-  if (updates.designation!== undefined) patch.designation= updates.designation?.trim() || null;
-  if (updates.pin        !== undefined) patch.pin        = updates.pin.trim();
-  if (updates.is_active  !== undefined) patch.is_active  = updates.is_active;
-
-  const { data, error } = await supabase
-    .from("employees")
-    .update(patch)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+export async function setEmployeePin(employeeId, pin) {
+  return upsertEmployeeProfile(employeeId, { pin: String(pin).trim() });
 }
 
-export async function toggleEmployeeActive(id, currentState) {
-  return updateEmployee(id, { is_active: !currentState });
+export async function setTrackLocation(employeeId, track_location) {
+  return upsertEmployeeProfile(employeeId, { track_location });
 }
 
-export async function resetEmployeePin(id, newPin) {
-  return updateEmployee(id, { pin: newPin });
+export async function setEmployeeRoster(employeeId, roster) {
+  return upsertEmployeeProfile(employeeId, { roster });
 }
 
 // ─── ATTENDANCE ──────────────────────────────────────────────────────────────
