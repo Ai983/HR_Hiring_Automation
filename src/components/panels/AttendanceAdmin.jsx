@@ -124,7 +124,7 @@ export default function AttendanceAdmin() {
 
   // Export CSV
   const exportCSV = () => {
-    const rows = [["Employee ID", "Name", "Department", "Type", "Date & Time", "Status", "Latitude", "Longitude", "Address", "Selfie URL", "Admin Notes"]];
+    const rows = [["Employee ID", "Name", "Department", "Type", "Date & Time", "Status", "Site", "Verified", "Accuracy (m)", "Latitude", "Longitude", "Address", "Selfie URL", "Admin Notes"]];
     for (const r of records) {
       rows.push([
         r.employees?.employee_code || "",
@@ -133,6 +133,9 @@ export default function AttendanceAdmin() {
         r.type,
         r.recorded_at,
         r.status,
+        r.site_name || "",
+        r.location_verified === false ? "flagged" : "verified",
+        r.accuracy != null ? Math.round(r.accuracy) : "",
         r.latitude ?? "",
         r.longitude ?? "",
         (r.address || "").replace(/,/g, ";"),
@@ -192,7 +195,7 @@ export default function AttendanceAdmin() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #e8e2d9", background: "#faf8f5" }}>
-                {["Employee", "Type", "Date & Time", "Status", "Location", "Selfie", "Notes", "Actions"].map((h) => (
+                {["Employee", "Type", "Date & Time", "Status", "Location", "Site", "Selfie", "Notes", "Actions"].map((h) => (
                   <th key={h} style={{ padding: "12px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#8a7e72", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -236,6 +239,21 @@ export default function AttendanceAdmin() {
                           📍 {rec.address ? rec.address.slice(0, 40) + (rec.address.length > 40 ? "…" : "") : `${rec.latitude?.toFixed(4)}, ${rec.longitude?.toFixed(4)}`}
                         </a>
                       ) : <span style={{ color: "#b0a898", fontSize: 12 }}>No location</span>}
+                    </td>
+                    <td style={{ padding: "11px 14px" }}>
+                      {rec.site_name ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
+                          <span style={{ fontSize: 12, color: rec.site_name === "Outside" ? "#dc2626" : "#1a1612", fontWeight: 600 }}>
+                            {rec.site_name}
+                          </span>
+                          {rec.location_verified === false && (
+                            <span style={{ padding: "1px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: "rgba(245,158,11,0.12)", color: "#b45309" }} title="GPS could not confirm the site — review the selfie">
+                              ⚠ Flagged
+                            </span>
+                          )}
+                          {rec.accuracy != null && <span style={{ fontSize: 10, color: "#b0a898" }}>±{Math.round(rec.accuracy)}m</span>}
+                        </div>
+                      ) : <span style={{ color: "#b0a898", fontSize: 12 }}>—</span>}
                     </td>
                     <td style={{ padding: "11px 14px" }}>
                       {rec.selfie_url
