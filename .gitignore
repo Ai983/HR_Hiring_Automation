@@ -3,6 +3,11 @@
 .env.local
 .env.*.local
 src/env.generated.js
+db-connections.json
+db-*.mjs
+db-*.json
+/env
+db-testuser.json
 
 # Dependencies
 node_modules/
@@ -14,3 +19,4 @@ build/
 .vscode/
 *.log
 .DS_Store
+sidebar-shot.png
