@@ -1,10 +1,27 @@
 # HireFlow — Attendance / Location / SSO Handoff
 
-_Last updated: 2026-07-29_
+_Last updated: 2026-07-30_
 
 Scope of this document: everything built **after the SEPL `HRMS.md` was shared** — the
 attendance + location + universal-login foundation. **Most of `HRMS.md` (payroll, full
-roster, performance, holidays, etc.) is NOT built yet** — see [Not started](#not-started).
+roster, performance, etc.) is NOT built yet** — see [Not started](#5-not-started).
+
+> ### ⚠️ Read this first — state as of 2026-07-30
+>
+> Three things a new dev will trip over immediately:
+>
+> 1. **The OpenAI account is out of quota** (`insufficient_quota`). Every AI feature —
+>    resume screening, JD enhancement, call prep, questionnaire, interview summary,
+>    reference summary, offer-letter text — returns a 502 with the provider's message.
+>    The code is fine; the account needs topping up.
+> 2. **RLS is now ON across the whole `hr` schema.** It used to be off on 11 tables and
+>    anon could read *and write* candidate PII. If a query suddenly returns 0 rows,
+>    check you are using the right key/role before assuming a bug.
+>    See `supabase/rls-hardening-golive.sql`.
+> 3. **The attendance module replaced a Google Sheet and carries 18,492 migrated rows.**
+>    10,622 of those punches are attached to an HR-only roster, not to hub employees,
+>    because 28 names were ambiguous. That mapping is still pending — see
+>    [Pending decisions](#4-in-the-middle--pending-decisions).
 
 ---
 
@@ -67,33 +84,150 @@ roster, performance, holidays, etc.) is NOT built yet** — see [Not started](#n
 
 ---
 
+### D. Full end-to-end test pass + 12 bug fixes (2026-07-30)
+
+Ran ~110 assertions against the live hub with throwaway QA accounts (since deleted):
+every service query, PostgREST embed, all 9 edge functions, storage, and anon probes.
+Bugs found and fixed:
+
+| # | Bug | Impact |
+|---|-----|--------|
+| 1 | Documents status cycle was `pending → not_applicable → pending` | `submitted`/`verified`/`rejected` unreachable — the whole verification feature was dead |
+| 2 | `datetime-local` sent naive local time, Postgres read it as UTC | **every interview scheduled 5.5h off**; same for callback times. Fixed via `localInputToISO` |
+| 3 | Quick-Add offered "No specific job" but `applicants.job_id` is NOT NULL | hard failure with a raw Postgres error |
+| 4 | `checkDuplicate` existed but was never called | duplicate candidates unpreventable |
+| 5 | `attendance-punch` had no duplicate guard | unlimited repeat punches; now a 409, IST-day aware |
+| 6 | `fetchCallQueue` never selected `call_logs` | call history never rendered |
+| 7 | Offers set stage `hired` on creation | inflated the Hired count before acceptance |
+| 8 | `generate-questionnaire` swallowed its insert error in a `try/catch` that could never fire | questionnaires silently failed to save |
+| 9 | `submitFeedback` wrote only the jsonb column, `synthesize-feedback` reads the flat ones | **AI scored every candidate "null/5"** |
+| 10 | Resume phone regex needed 10 *consecutive* digits | `+91 98765 43210` yielded a blank phone — HR had no number to call |
+| 11 | 4 AI functions read only `OPENAI_API_KEY` and indexed `choices[0]` unchecked | any provider error surfaced as `Cannot read properties of undefined` |
+| 12 | Leave day columns were `numeric(4,1)` | **0.25-day short leaves silently rounded to 0.3** — 20% over-count, incl. 126 imported rows |
+
+Also wired three edge functions that existed but nothing called: offer-letter
+generation (now produces a real `.docx` — AI writes only the welcome paragraph,
+every figure comes from `computeCtcBreakup`), interview panel summary, and
+reference summary.
+
+### E. Security hardening (2026-07-30) — `supabase/rls-hardening-golive.sql`
+
+Verified with the anon key that ships in the browser bundle: candidate PII, offer CTC,
+call notes and interview feedback were all readable, and `INSERT` into `hr.applicants`
+**succeeded**. Separately, any logged-in employee could read every colleague's
+attendance, read stored PINs, and file leave under someone else's ID.
+
+- RLS enabled on all 15 `hr` tables; anon fully sealed (0 rows, `42501` on write).
+- Hiring tables scoped to `hr.has_hireflow()`, which recomputes the hub's own module
+  maths so it can never drift from `hr.my_context()`.
+- attendance / location / leave / employee_profile scoped per-employee, with
+  `hr.is_hr_admin()` for HR/admin.
+- The three roll-up views were owner-rights views and **bypassed RLS entirely**; they
+  now use `security_invoker = true`.
+
+60/60 security assertions passed, tested as both an HR user and an ordinary
+`site_engineer`.
+
+### F. Attendance parity with the retired HSIPL Google Sheet (2026-07-30)
+
+The punch screen was already better on identity and GPS, but the entire calculation
+layer the month runs on did not exist. Full record in
+`supabase/hr-attendance-hsipl-parity.sql`.
+
+New in `hr`: `sites` (45), `attendance_person` (HR-only roster), `holidays`,
+`attendance_settings` (shift 08:00–19:00, late 09:30, full day 9h, OT past 9h,
+weekend days), `attendance_remarks`, plus views `attendance_subject`,
+`attendance_day` (replaces BACKHAND + Monthly Attendance) and `attendance_month`
+(replaces the Overtime Sheet).
+
+New panels: **Weekly Report** (person × day grid), **Monthly Report** (month totals +
+day-by-day drawer + remarks), **Attendance Setup** (sites / holidays / shift rules).
+Portal regained the required site dropdown and the photo is now mandatory.
+
+Migrated: 17,584 punches (2024-03-08 → 2026-07-30, photo links kept), 908 leave
+records, 16 Sunday-workers, 45 sites, 10 holidays.
+
+**Validated against the sheet's own computed report** — Shivani, July 2026, all nine
+metrics identical: 25 working days, 24 on time, 1 late, SL 2, CL/EL/HD/SHL/UL 0.
+Her hours tie out too (9:24am–6:31pm = 547 min), and the sheet's own OT flag on that
+day confirms overtime starts past 9h.
+
+---
+
 ## 3. Current state (verified working)
 
-- Admin app: hub login → module-gated UI. Verified with a temp user (attendance-only vs hireflow).
-- Attendance portal: hub login → PIN-free check-in (JWT). Verified end-to-end.
-- Team Map: returns punched locations (verified via the exact `fetchLatest` query).
+- Admin app: hub login → module-gated UI. Verified with temp users (attendance-only,
+  hireflow, and a plain `site_engineer`).
+- Attendance portal: hub login → site pick → photo → punch. Duplicate punches rejected
+  with 409. GPS cross-checks the chosen site and flags mismatches but never blocks.
+- Weekly / Monthly reports derive from the punches — changing the OT threshold from 9h
+  to 10h in the UI moved Shivani's July OT from 172 min to 0 and back, proving the
+  numbers are computed, not stored.
+- Team Map returns punched locations.
 - `notify-attendance`: dry-run verified — **53 recipients**, correct message. **Nothing sent.**
-- Dev server runs on **http://localhost:5174/** (5173 is taken by another local hub app).
+- Browser-layer tested where possible: real PDF and DOCX text extraction, 19/19 Indian
+  phone formats, CSV comma escaping, geofence math, leave policy, datetime round-trip.
+- Dev server runs on **http://localhost:5173/** (5174 if 5173 is taken by another hub app).
+
+### Not verifiable from outside a browser
+Camera selfie capture, `navigator.geolocation`, Leaflet rendering, kanban drag-and-drop
+and CSV download all need a real browser with hardware permissions. The data paths
+behind them are tested; the interactions are not.
 
 ---
 
 ## 4. In the middle / pending decisions
 
-- **Notification blast NOT sent.** Needs: (1) a **public URL** for the portal, (2) go-ahead
-  (test-to-one-number first, then ~52 staff). Trigger: `POST /functions/v1/notify-attendance`
-  with `{ portal_url, dry_run? , test_phone? }` as an admin.
-- **App not deployed publicly** — only localhost. Employees can't reach it yet (Vercel/Railway TBD).
+### Blocked on a business decision (not code)
+
+- **🔴 OpenAI account out of quota.** All 6 AI features return 502. Top up billing at
+  platform.openai.com; no code change needed. The functions accept either the
+  `OPEN_API` or `OPENAI_API_KEY` secret.
+- **28 ambiguous name mappings.** 10,622 imported punches sit on `hr.attendance_person`
+  unlinked. Only exact name matches were linked, because a wrong link puts attendance on
+  the wrong person's payroll. `Amit` (769 punches) could be Amit Choudhary or Amit Kumar
+  Mishra; `Ritu` (701) could be Ritu Sharma or Ritu Ma'am; and the hub itself contains
+  genuine duplicates — Avisha ×2, Mohit Sharma ×2, Mukul Tyagi ×2, Rohit Sharma ×2.
+  To review, with my suggestion in `note`:
+  ```sql
+  select full_name, note from hr.attendance_person
+  where employee_id is null order by full_name;
+  ```
+  To link one: `update hr.attendance_person set employee_id = '<uuid>' where id = '<uuid>';`
+  The views pick it up immediately — nothing needs re-importing.
+- **Site coordinates deliberately blank.** `hr.sites` has 45 sites and no lat/long. A
+  guessed coordinate would falsely flag every genuine punch at that site as a GPS
+  mismatch. Add them per site in Attendance Setup; verification switches on as you do.
+- **SHL = 0.25 day is an inference**, from the Setting tab's `0.75` short-leave totals
+  being 3 × SHL. Confirm; it's a one-line change in `src/leaveConfig.js`.
+- **Notification blast NOT sent.** Needs a public portal URL and a go-ahead
+  (test-to-one-number first, then ~52 staff). Trigger:
+  `POST /functions/v1/notify-attendance` with `{ portal_url, dry_run?, test_phone? }` as
+  an admin.
+- **App not deployed publicly** — only localhost. Employees can't reach the portal yet.
+- **n8n workflows are re-pointed but INACTIVE.** Activating them sends real WhatsApp
+  messages to real candidates, so it is a deliberate step. See `n8n-workflows/SETUP.md`.
+
+### Known small gaps
+
 - **No "Notify employees" button** in the admin UI — only the edge function exists.
-- **PIN is vestigial** — punching uses SSO now; the PIN field in "HR Settings" does nothing and
-  should be removed (plus `setEmployeePin` / `pin` column cleanup).
-- Unused `getSession` import remains in `AppContext.jsx` (harmless).
+- **PIN is vestigial** — punching uses SSO. The PIN field in "HR Settings" does nothing.
+  `hr.employees` still exposes the `pin` column to any authenticated user; the commented
+  block at the bottom of `rls-hardening-golive.sql` drops it once the UI field goes.
+- **Weekly/Monthly reports are read-only.** Correcting a punch is still done from the
+  Attendance panel; there is no inline edit from the report.
+- The old project `sgerslbmnwrltqrhsdir` had its service-role key committed in this repo
+  in plaintext. It has been removed, but **treat that key as leaked** and delete the old
+  project if it still holds candidate data.
 
 ---
 
 ## 5. Not started
 
-Rest of SEPL `HRMS.md`: **payroll & salary structures, full roster/shift management, performance,
-holiday calendar**, and related modules. Only the attendance/location/employees/auth slice is done.
+Rest of SEPL `HRMS.md`: **payroll & salary structures, full shift management, performance**,
+and related modules. The attendance / location / leave / employees / auth slice is done,
+including the holiday calendar and overtime that the earlier version of this doc listed
+as missing.
 
 ---
 
@@ -101,21 +235,51 @@ holiday calendar**, and related modules. Only the attendance/location/employees/
 
 ```bash
 npm install
-npm run dev          # http://localhost:5174/  (admin app)
-                     # http://localhost:5174/attend.html  (employee portal)
+npm run dev          # http://localhost:5173/             (admin app)
+                     # http://localhost:5173/attend.html  (employee portal)
 ```
 Log in with any Hagerstone Hub email + password. Access follows the person's modules.
 
-**Secrets** live in the local `env` file (gitignored) and as Supabase edge-function secrets.
-Edge functions deploy with: `npx supabase functions deploy <name> --project-ref tpfvnerrjhqwipyonngf`.
+**Secrets** live in the local `.env` (gitignored) and as Supabase edge-function secrets.
+
+**Deploying edge functions.** `npx supabase functions deploy <name> --project-ref
+tpfvnerrjhqwipyonngf` needs `SUPABASE_ACCESS_TOKEN` or `supabase login`. Current
+deployed versions: `attendance-punch` v8, `generate-questionnaire` v5,
+`synthesize-feedback` v5, `generate-offer-letter` v5, `summarize-reference` v5,
+`call-prep` v5.
+
+**Sanity checks after any schema change:**
+```sql
+select * from hr.attendance_settings;                    -- shift / OT rules
+select count(*) from hr.attendance where source='import'; -- 17584
+select * from hr.attendance_month
+ where month = date_trunc('month', current_date)::date;   -- this month's report
+```
+
+> **Migrations are NOT in git.** Schema went to production via `apply_migration`.
+> `supabase/hr-attendance-hsipl-parity.sql` and `supabase/rls-hardening-golive.sql`
+> are the written record of what was applied and in what order. A fresh clone gives
+> you the app but not the schema.
 
 ---
 
 ## 7. Security notes
 
 - `env`, `.env`, `db-connections.json`, `db-*.json/mjs` are gitignored — **never commit secrets.**
-- `hr.employees` view is security-definer (bypasses RLS) so any authenticated user can read the
-  full roster via it. Acceptable for now; harden later if needed.
+- **RLS is ON across all 15 `hr` tables** (`supabase/rls-hardening-golive.sql`). anon gets
+  nothing. Hiring tables require the `hireflow` module via `hr.has_hireflow()`;
+  attendance/leave/location are self-scoped with `hr.is_hr_admin()` for HR and admin.
+- **Views must use `security_invoker = true`.** `attendance_subject`, `attendance_day` and
+  `attendance_month` originally did not, and silently bypassed RLS. If you add a view over
+  an RLS-protected table, set this or you will leak the table.
+- `hr.employees` remains a security-definer view, so any authenticated user can read the
+  roster (names, emails, departments) through it — and currently the vestigial `pin`
+  column too. Accepted for now; the fix is sketched at the end of the hardening SQL.
+- Edge functions use the service-role key and therefore **bypass RLS by design**. Any new
+  one must do its own authorisation — `attendance-punch` is the reference: it identifies
+  the caller from the JWT and never trusts a client-supplied employee id.
+- n8n hits the hub with the service-role key and needs `Accept-Profile: hr` /
+  `Content-Profile: hr`, because the tables are not in `public`.
 
 ---
 
@@ -130,10 +294,39 @@ These `.md`/`.sql` files carry the design context for the whole system and belon
 | `LOCATION-TRACKING-SYSTEM.md` | Full SEPL location-tracking + geofenced-attendance system flow — the source spec for our location feature. |
 | `LOCATION-TRACKING-HIREFLOW-PLAN.md` | Implementation plan that ported that system into **this** repo (React 18 + JSX + Supabase). Matches what was built. |
 | `LOCATION-TRACKING-HUB-PLAN.md` | Parallel plan written for the Hagerstone Hub (React 19 + TS). Logic reference only — not this repo's file paths. |
-| `n8n-workflows/SETUP.md` | The 8 hiring-automation n8n workflows (WhatsApp/MayTAPI) + import instructions. |
+| `n8n-workflows/SETUP.md` | The 8 hiring-automation n8n workflows (WhatsApp/MayTAPI) + import instructions. **Includes the 2026-07-30 hub re-point** and what each workflow still needs. |
+| `supabase/rls-hardening-golive.sql` | **Applied.** The RLS model for the whole `hr` schema, with the evidence that prompted it and a rollback block. |
+| `supabase/hr-attendance-hsipl-parity.sql` | **Applied.** Full record of the attendance rebuild: objects created, data migrated, the sheet's inconsistent date formats, and the validation against the sheet's own report. |
+| `supabase/rls-location.sql` | Applied earlier — RLS for the 4 attendance/location tables. Superseded in part by the go-live hardening. |
 | `DEPLOY-NOTES.md` | ⚠️ Deploy steps written for the **old** standalone project `sgerslbmnwrltqrhsdir` ("Hiring System"), **not** the current hub `tpfvnerrjhqwipyonngf`. Treat as historical. |
 | `RUN-IN-SQL-EDITOR.sql` | ⚠️ One-off location schema for the **old** project `sgerslbmnwrltqrhsdir`. Superseded by `supabase/hub-migration/*.sql`. Historical. |
 | `HANDOFF.md` | This document. |
 
 **Reading order for a new dev:** `hagerstone-hiring-automation-blueprint.md` → `HANDOFF.md` (this) →
-`LOCATION-TRACKING-SYSTEM.md` → `LOCATION-TRACKING-HIREFLOW-PLAN.md` → `HRMS.md` (for the road ahead).
+`supabase/rls-hardening-golive.sql` (how access works now) →
+`supabase/hr-attendance-hsipl-parity.sql` (how attendance works now) →
+`LOCATION-TRACKING-SYSTEM.md` → `LOCATION-TRACKING-HIREFLOW-PLAN.md` → `HRMS.md` (the road ahead).
+
+---
+
+## 9. Working rule for this repo
+
+`public.employees` and every other module's schema (`cps`, `finance`, `lcs`, delegation,
+gie) are **read-only from HireFlow**. They are shared with live apps. When the HSIPL sheet
+brought in 40 people with no hub account, they went into `hr.attendance_person` rather
+than the shared master — which is why `hr.attendance` and `hr.leave_requests` both carry a
+nullable `employee_id` XOR `person_ref`.
+
+Before and after any schema work, snapshot row counts of all non-`hr` tables and diff
+them. The only delta should be `supabase_migrations`:
+
+```sql
+select string_agg(format('%s=%s', tbl, n), ' | ' order by tbl)
+from (select c.relname tbl,
+             (xpath('/row/c/text()', query_to_xml(
+               format('select count(*) as c from %I.%I', n.nspname, c.relname),
+               false, true, '')))[1]::text::bigint n
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where c.relkind='r' and n.nspname not in
+            ('pg_catalog','information_schema','hr') and n.nspname not like 'pg_%') s;
+```
