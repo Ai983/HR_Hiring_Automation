@@ -256,10 +256,17 @@ select * from hr.attendance_month
  where month = date_trunc('month', current_date)::date;   -- this month's report
 ```
 
-> **Migrations are NOT in git.** Schema went to production via `apply_migration`.
-> `supabase/hr-attendance-hsipl-parity.sql` and `supabase/rls-hardening-golive.sql`
-> are the written record of what was applied and in what order. A fresh clone gives
-> you the app but not the schema.
+> **Rebuilding the schema.** The applied DDL is exported to
+> `supabase/migrations/` (8 files, in order — see the README there). Apply those, then
+> `supabase/rls-location.sql` and `supabase/rls-hardening-golive.sql` for the access
+> model. All are idempotent.
+>
+> A fresh clone still will **not** have: `.env` (copy `.env.example`), the 18,492
+> migrated attendance rows (live data, source export is gitignored — it contains
+> employee PII), the edge-function secrets, or the storage buckets.
+>
+> `supabase/hr-attendance-hsipl-parity.sql` is prose, not DDL — it explains *why*
+> the schema looks like it does. `supabase/migrations/` is what you actually run.
 
 ---
 
@@ -298,6 +305,7 @@ These `.md`/`.sql` files carry the design context for the whole system and belon
 | `supabase/rls-hardening-golive.sql` | **Applied.** The RLS model for the whole `hr` schema, with the evidence that prompted it and a rollback block. |
 | `supabase/hr-attendance-hsipl-parity.sql` | **Applied.** Full record of the attendance rebuild: objects created, data migrated, the sheet's inconsistent date formats, and the validation against the sheet's own report. |
 | `supabase/rls-location.sql` | Applied earlier — RLS for the 4 attendance/location tables. Superseded in part by the go-live hardening. |
+| `supabase/migrations/` | **The runnable DDL**, exported from what was actually applied. `README.md` there gives the order and lists what a clone still won't have. |
 | `DEPLOY-NOTES.md` | ⚠️ Deploy steps written for the **old** standalone project `sgerslbmnwrltqrhsdir` ("Hiring System"), **not** the current hub `tpfvnerrjhqwipyonngf`. Treat as historical. |
 | `RUN-IN-SQL-EDITOR.sql` | ⚠️ One-off location schema for the **old** project `sgerslbmnwrltqrhsdir`. Superseded by `supabase/hub-migration/*.sql`. Historical. |
 | `HANDOFF.md` | This document. |
