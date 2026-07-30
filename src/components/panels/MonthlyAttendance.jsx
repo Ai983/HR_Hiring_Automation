@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useApp } from "../../context/AppContext.jsx";
-import { fetchAttendanceMonth, fetchAttendanceDays, fetchAttendanceSubjects } from "../../services/attendanceService.js";
+import { fetchAttendanceMonth, fetchAttendanceDays, fetchRemarks, addRemark, deleteRemark } from "../../services/attendanceService.js";
 
 // Replaces the HSIPL sheet's "Overtime Sheet" (per-person month totals + a row
 // per date) and "Monthly Attendance" tabs.
@@ -38,7 +38,29 @@ function monthOptions(count = 18) {
 // ─── Per-person day-by-day drawer ────────────────────────────────────────────
 
 function DayDetail({ row, month, onClose }) {
+  const { ctx } = useApp();
   const [days, setDays] = useState(null);
+  const [remarks, setRemarks] = useState([]);
+  const [rDate, setRDate] = useState("");
+  const [rText, setRText] = useState("");
+
+  const monthEnd = (m) => {
+    const d = new Date(new Date(m + "T00:00:00").getFullYear(), new Date(m + "T00:00:00").getMonth() + 1, 0);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const loadRemarks = () => fetchRemarks({
+    from: month, to: monthEnd(month), subjectId: row.subject_id, subjectKind: row.subject_kind,
+  }).then(setRemarks).catch(() => setRemarks([]));
+  useEffect(() => { loadRemarks(); }, [row.subject_id, month]);
+
+  const saveRemark = async () => {
+    if (!rDate || !rText.trim()) return;
+    try {
+      await addRemark({ subjectId: row.subject_id, subjectKind: row.subject_kind,
+        remark_date: rDate, remark: rText, created_by: ctx?.name || "HR" });
+      setRDate(""); setRText(""); loadRemarks();
+    } catch (e) { /* surfaced by the disabled state / console */ }
+  };
 
   useEffect(() => {
     const from = month;
@@ -109,6 +131,35 @@ function DayDetail({ row, month, onClose }) {
               </tbody>
             </table>
           )}
+        </div>
+
+        <div style={{ borderTop: "1px solid #e8e2d9", padding: "14px 20px", background: "#faf8f5" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".4px", color: "#8a7e72", marginBottom: 8 }}>
+            Remarks for {monthLabel(month)}
+          </div>
+          {remarks.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              {remarks.map((r) => (
+                <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "5px 0", borderBottom: "1px solid #ede6db", fontSize: 12 }}>
+                  <span style={{ color: "#8a7e72", whiteSpace: "nowrap", minWidth: 74 }}>
+                    {new Date(r.remark_date + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                  </span>
+                  <span style={{ flex: 1, color: "#1a1612" }}>{r.remark}</span>
+                  {r.created_by && <span style={{ color: "#b0a898", fontSize: 10 }}>{r.created_by}</span>}
+                  <button className="btn-ghost" style={{ fontSize: 11, color: "#dc2626", padding: "0 4px" }}
+                    onClick={async () => { await deleteRemark(r.id); loadRemarks(); }}>remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <input className="form-input" type="date" style={{ maxWidth: 150 }} min={month} max={monthEnd(month)}
+              value={rDate} onChange={(e) => setRDate(e.target.value)} />
+            <input className="form-input" style={{ flex: 1, minWidth: 180 }} placeholder="e.g. Short leave, late in office"
+              value={rText} onChange={(e) => setRText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveRemark()} />
+            <button className="btn-gold" onClick={saveRemark} disabled={!rDate || !rText.trim()}>Add remark</button>
+          </div>
         </div>
       </div>
     </div>

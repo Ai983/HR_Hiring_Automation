@@ -226,3 +226,39 @@ export async function fetchEmployeeProfile(employeeId) {
   const { data } = await supabase.from("employee_profile").select("*").eq("employee_id", employeeId).maybeSingle();
   return data || null;
 }
+
+// ─── REMARKS (the sheet's "Remarks" tab) ────────────────────────────────────
+// A remark hangs off either a hub employee or an HR-roster person, matching the
+// XOR constraint on the table. Callers pass the subject straight from
+// attendance_month / attendance_day, so this maps kind -> the right column.
+
+const subjectCols = (subjectId, subjectKind) =>
+  subjectKind === "roster" ? { person_ref: subjectId } : { employee_id: subjectId };
+
+export async function fetchRemarks({ from, to, subjectId, subjectKind } = {}) {
+  if (!supabase) return [];
+  let q = supabase.from("attendance_remarks").select("*").order("remark_date", { ascending: false });
+  if (from) q = q.gte("remark_date", from);
+  if (to)   q = q.lte("remark_date", to);
+  if (subjectId) {
+    const c = subjectCols(subjectId, subjectKind);
+    q = c.person_ref ? q.eq("person_ref", c.person_ref) : q.eq("employee_id", c.employee_id);
+  }
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addRemark({ subjectId, subjectKind, remark_date, remark, created_by }) {
+  const { data, error } = await supabase.from("attendance_remarks").insert({
+    ...subjectCols(subjectId, subjectKind),
+    remark_date, remark: remark.trim(), created_by: created_by || null,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteRemark(id) {
+  const { error } = await supabase.from("attendance_remarks").delete().eq("id", id);
+  if (error) throw error;
+}

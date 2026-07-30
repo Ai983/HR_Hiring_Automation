@@ -12,6 +12,7 @@ import Questionnaire from "./components/panels/Questionnaire.jsx";
 import ResumeReport from "./components/panels/ResumeReport.jsx";
 import AttendanceAdmin from "./components/panels/AttendanceAdmin.jsx";
 import MonthlyAttendance from "./components/panels/MonthlyAttendance.jsx";
+import WeeklyAttendance from "./components/panels/WeeklyAttendance.jsx";
 import AttendanceSetup from "./components/panels/AttendanceSetup.jsx";
 import LocationTracking from "./components/panels/LocationTracking.jsx";
 import GeofenceSites from "./components/panels/GeofenceSites.jsx";
@@ -95,6 +96,7 @@ function AppContent() {
               {panel === "report"       && <ResumeReport />}
               {panel === "survey"        && <SurveyLeads />}
               {panel === "attendance"   && <AttendanceAdmin />}
+              {panel === "weekly"       && <WeeklyAttendance />}
               {panel === "monthly"      && <MonthlyAttendance />}
               {panel === "attsetup"     && <AttendanceSetup />}
               {panel === "location"     && <LocationTracking />}

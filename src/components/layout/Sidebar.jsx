@@ -58,6 +58,7 @@ export default function Sidebar() {
       label: "Employee Management",
       items: [
         { id: "attendance",    icon: "⏰", label: "Attendance" },
+        { id: "weekly",        icon: "\u{1F5D3}", label: "Weekly Report" },
         { id: "monthly",       icon: "\u{1F4CA}", label: "Monthly Report" },
         { id: "attsetup",      icon: "⚙", label: "Attendance Setup" },
         { id: "location",      icon: "\u{1F4CD}", label: "Location Tracking" },
