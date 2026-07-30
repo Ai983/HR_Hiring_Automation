@@ -5,7 +5,10 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "hours", "hoursInterval": 4 }
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
           ]
         }
       },
@@ -13,26 +16,51 @@
       "name": "Schedule — Every 4 Hours",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/call_logs",
+        "url": "https://tpfvnerrjhqwipyonngf.supabase.co/rest/v1/call_logs",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "call_status", "value": "eq.not_picked" },
-            { "name": "created_at", "value": "={{ 'gte.' + new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() }}" },
-            { "name": "select", "value": "id,applicant_id,created_at,applicants(full_name,phone)" },
-            { "name": "order", "value": "created_at.desc" }
+            {
+              "name": "call_status",
+              "value": "eq.not_picked"
+            },
+            {
+              "name": "created_at",
+              "value": "={{ 'gte.' + new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() }}"
+            },
+            {
+              "name": "select",
+              "value": "id,applicant_id,created_at,applicants(full_name,phone)"
+            },
+            {
+              "name": "order",
+              "value": "created_at.desc"
+            }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+            {
+              "name": "apikey",
+              "value": "__HUB_SERVICE_ROLE_KEY__"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer __HUB_SERVICE_ROLE_KEY__"
+            },
+            {
+              "name": "Accept-Profile",
+              "value": "hr"
+            }
           ]
         },
         "options": {}
@@ -41,7 +69,10 @@
       "name": "Supabase — Fetch Not Picked Calls",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300]
+      "position": [
+        480,
+        300
+      ]
     },
     {
       "parameters": {
@@ -51,7 +82,10 @@
       "name": "Deduplicate Candidates",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
@@ -60,8 +94,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "x-maytapi-key",
+              "value": "ebfd5e67-6403-4921-b300-a54364f2c470"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -73,18 +113,45 @@
       "name": "Maytapi — WhatsApp Candidate Retry",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 300]
+      "position": [
+        960,
+        300
+      ]
     }
   ],
   "connections": {
     "Schedule — Every 4 Hours": {
-      "main": [[{ "node": "Supabase — Fetch Not Picked Calls", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Supabase — Fetch Not Picked Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Supabase — Fetch Not Picked Calls": {
-      "main": [[{ "node": "Deduplicate Candidates", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Deduplicate Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Deduplicate Candidates": {
-      "main": [[{ "node": "Maytapi — WhatsApp Candidate Retry", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Maytapi — WhatsApp Candidate Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -93,5 +160,15 @@
     "saveManualExecutions": true
   },
   "id": "call-retry-v1",
-  "tags": [{ "name": "hagerstone" }, { "name": "calling" }, { "name": "automation" }]
+  "tags": [
+    {
+      "name": "hagerstone"
+    },
+    {
+      "name": "calling"
+    },
+    {
+      "name": "automation"
+    }
+  ]
 }

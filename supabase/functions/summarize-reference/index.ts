@@ -49,11 +49,16 @@ Respond ONLY with valid JSON in this exact format:
 
     const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}` },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("OPEN_API") || Deno.env.get("OPENAI_API_KEY")}` },
       body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: prompt }], response_format: { type: "json_object" }, max_tokens: 350 }),
     });
 
     const aiData = await aiRes.json();
+    if (!aiData?.choices?.[0]) {
+      const openaiError = aiData?.error?.message || "OpenAI returned no completion.";
+      return new Response(JSON.stringify({ error: `AI service error: ${openaiError}` }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const result = JSON.parse(aiData.choices[0].message.content);
 
     return new Response(JSON.stringify({ ...result, average_rating: parseFloat(avgRating.toFixed(1)), ref_count: refs.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

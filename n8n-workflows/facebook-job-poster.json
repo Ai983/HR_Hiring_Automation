@@ -12,7 +12,10 @@
       "name": "Trigger — Post to Facebook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "notes": "Call this webhook from HireFlow UI when user clicks 'Post to Facebook'. Send job details in POST body."
     },
     {
@@ -25,7 +28,10 @@
       "name": "Respond — Queued",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [480, 180]
+      "position": [
+        480,
+        180
+      ]
     },
     {
       "parameters": {
@@ -35,7 +41,10 @@
       "name": "Build Facebook Post Text",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [480, 380]
+      "position": [
+        480,
+        380
+      ]
     },
     {
       "parameters": {
@@ -44,7 +53,10 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "access_token", "value": "={{ $vars.FACEBOOK_PAGE_ACCESS_TOKEN }}" }
+            {
+              "name": "access_token",
+              "value": "={{ $vars.FACEBOOK_PAGE_ACCESS_TOKEN }}"
+            }
           ]
         },
         "sendBody": true,
@@ -56,7 +68,10 @@
       "name": "Facebook Graph API — Post to Page",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 300],
+      "position": [
+        720,
+        300
+      ],
       "notes": "Set n8n Variables: FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN.\nGet these from Meta Business Manager after creating your Facebook Page."
     },
     {
@@ -66,10 +81,22 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "access_token", "value": "={{ $vars.FACEBOOK_PAGE_ACCESS_TOKEN }}" },
-            { "name": "caption", "value": "={{ $('Build Facebook Post Text').item.json.post_text }}" },
-            { "name": "media_type", "value": "REELS" },
-            { "name": "image_url", "value": "={{ $vars.HAGERSTONE_LOGO_URL || 'https://via.placeholder.com/1080x1080?text=Hagerstone+is+Hiring' }}" }
+            {
+              "name": "access_token",
+              "value": "={{ $vars.FACEBOOK_PAGE_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Build Facebook Post Text').item.json.post_text }}"
+            },
+            {
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "image_url",
+              "value": "={{ $vars.HAGERSTONE_LOGO_URL || 'https://via.placeholder.com/1080x1080?text=Hagerstone+is+Hiring' }}"
+            }
           ]
         },
         "options": {}
@@ -78,7 +105,10 @@
       "name": "Instagram — Create Media Container",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 480],
+      "position": [
+        720,
+        480
+      ],
       "notes": "Set n8n Variable: INSTAGRAM_BUSINESS_ACCOUNT_ID (from Meta Business Manager).\nThis creates a media container; follow up with a publish call."
     },
     {
@@ -88,8 +118,14 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "access_token", "value": "={{ $vars.FACEBOOK_PAGE_ACCESS_TOKEN }}" },
-            { "name": "creation_id", "value": "={{ $json.id }}" }
+            {
+              "name": "access_token",
+              "value": "={{ $vars.FACEBOOK_PAGE_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            }
           ]
         },
         "options": {}
@@ -98,7 +134,10 @@
       "name": "Instagram — Publish Post",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 480]
+      "position": [
+        960,
+        480
+      ]
     },
     {
       "parameters": {
@@ -108,18 +147,34 @@
       "name": "Log Post Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1200, 380]
+      "position": [
+        1200,
+        380
+      ]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/jobs?id=eq.{{ $json.job_id }}",
+        "url": "=https://tpfvnerrjhqwipyonngf.supabase.co/rest/v1/jobs?id=eq.{{ $json.job_id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "apikey",
+              "value": "__HUB_SERVICE_ROLE_KEY__"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer __HUB_SERVICE_ROLE_KEY__"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Profile",
+              "value": "hr"
+            }
           ]
         },
         "sendBody": true,
@@ -131,33 +186,92 @@
       "name": "Supabase — Update Job Portal Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 380]
+      "position": [
+        1440,
+        380
+      ]
     }
   ],
   "connections": {
     "Trigger — Post to Facebook": {
       "main": [
-        [{ "node": "Respond — Queued", "type": "main", "index": 0 }],
-        [{ "node": "Build Facebook Post Text", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Respond — Queued",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Facebook Post Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Facebook Post Text": {
       "main": [
-        [{ "node": "Facebook Graph API — Post to Page", "type": "main", "index": 0 }],
-        [{ "node": "Instagram — Create Media Container", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Facebook Graph API — Post to Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Instagram — Create Media Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Instagram — Create Media Container": {
-      "main": [[{ "node": "Instagram — Publish Post", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Instagram — Publish Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Facebook Graph API — Post to Page": {
-      "main": [[{ "node": "Log Post Results", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log Post Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Instagram — Publish Post": {
-      "main": [[{ "node": "Log Post Results", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log Post Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Post Results": {
-      "main": [[{ "node": "Supabase — Update Job Portal Status", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Supabase — Update Job Portal Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -171,5 +285,15 @@
     "notes": "AWAITING CREDENTIALS: Set n8n Variables FACEBOOK_PAGE_ID, FACEBOOK_PAGE_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID before activating."
   },
   "id": "facebook-job-poster-v1",
-  "tags": [{ "name": "hagerstone" }, { "name": "job-posting" }, { "name": "facebook" }]
+  "tags": [
+    {
+      "name": "hagerstone"
+    },
+    {
+      "name": "job-posting"
+    },
+    {
+      "name": "facebook"
+    }
+  ]
 }

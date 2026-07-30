@@ -41,9 +41,22 @@ export async function updateInterview(id, fields) {
 }
 
 export async function submitFeedback(interviewId, feedback) {
+  // Write BOTH shapes: the jsonb blob the UI reads back, and the flat columns
+  // the synthesize-feedback Edge Function scores from. Writing only the jsonb
+  // left those columns null, so the AI summary saw "null/5" for every rating.
   const { data, error } = await supabase
     .from("interviews")
-    .update({ feedback, status: "completed" })
+    .update({
+      feedback,
+      feedback_technical:      feedback?.technical ?? null,
+      feedback_communication:  feedback?.communication ?? null,
+      feedback_culture_fit:    feedback?.culture_fit ?? null,
+      feedback_recommendation: feedback?.recommendation ?? null,
+      feedback_notes:          feedback?.notes ?? null,
+      outcome: feedback?.recommendation === "pass" ? "pass"
+             : feedback?.recommendation === "fail" ? "fail" : "hold",
+      status: "completed",
+    })
     .eq("id", interviewId)
     .select("*")
     .single();

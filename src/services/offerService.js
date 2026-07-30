@@ -43,6 +43,26 @@ export async function createOffer(fields) {
   return data;
 }
 
+const BUCKET = "offer-letters";
+
+/** Upload a generated letter and return its storage path. */
+export async function uploadOfferLetter(offerId, blob) {
+  const path = `${offerId}/offer-letter-${Date.now()}.docx`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    upsert: true,
+  });
+  if (error) throw new Error(error.message || "Could not upload the offer letter.");
+  return path;
+}
+
+/** Offer letters live in a PRIVATE bucket (they contain salary) — sign on demand. */
+export async function signedOfferLetterUrl(path, expiresIn = 300) {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresIn);
+  if (error) throw new Error(error.message || "Could not open the offer letter.");
+  return data.signedUrl;
+}
+
 export async function updateOffer(id, fields) {
   const { data, error } = await supabase
     .from("offers")

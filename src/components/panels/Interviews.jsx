@@ -4,6 +4,7 @@ import { STAGE_META } from "../../constants.js";
 import { fetchInterviews, createInterview, updateInterview, submitFeedback } from "../../services/interviewService.js";
 import { updateApplicantStage } from "../../services/applicantService.js";
 import { localInputToISO } from "../../helpers.js";
+import { synthesizeFeedback } from "../../services/aiService.js";
 
 const OVERLAY = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
 const MODAL = { background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 540, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" };
@@ -19,6 +20,8 @@ export default function Interviews() {
   const [saving, setSaving] = useState(false);
   const [schedForm, setSchedForm] = useState({ interview_type: "hr", scheduled_at: "", duration_minutes: 60, mode: "google_meet", meet_link: "", panel: "", venue: "" });
   const [fbForm, setFbForm] = useState({ technical: 3, communication: 3, culture_fit: 3, recommendation: "hold", notes: "" });
+  const [synth, setSynth] = useState({});      // interviewId -> { summary, average_score }
+  const [synthId, setSynthId] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -63,6 +66,15 @@ export default function Interviews() {
     setSaving(false);
   }
 
+  async function loadSynthesis(iv) {
+    setSynthId(iv.id);
+    try {
+      const result = await synthesizeFeedback(iv.id);
+      setSynth((s) => ({ ...s, [iv.id]: result }));
+    } catch (e) { showToast(e.message || "Could not summarise the panel feedback.", false); }
+    setSynthId(null);
+  }
+
   async function cancelInterview(id) {
     if (!window.confirm("Cancel this interview?")) return;
     await updateInterview(id, { status: "cancelled" });
@@ -99,12 +111,30 @@ export default function Interviews() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {interviews.map((iv) => (
-            <div key={iv.id} className="card" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div key={iv.id} className="card" style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{iv.applicants?.full_name}</div>
                 <div style={{ fontSize: 12, color: "#8a7e72" }}>{iv.applicants?.jobs?.title} · {iv.interview_type?.toUpperCase()} · {iv.mode?.replace("_", " ")}</div>
                 <div style={{ fontSize: 12, color: "#5a5048", marginTop: 2 }}>{new Date(iv.scheduled_at).toLocaleString()}</div>
                 {iv.meet_link && <a href={iv.meet_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#0ea5e9" }}>Meet Link</a>}
+
+                {iv.status === "completed" && (
+                  <div style={{ marginTop: 8 }}>
+                    {synth[iv.id] ? (
+                      <div style={{ background: "#faf8f5", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#1a1612" }}>
+                        <div style={{ fontWeight: 700, color: "#5a5048", marginBottom: 4 }}>
+                          ✦ AI panel summary · avg {synth[iv.id].average_score}/5
+                        </div>
+                        {synth[iv.id].summary}
+                      </div>
+                    ) : (
+                      <button className="btn-outline" style={{ fontSize: 11, padding: "3px 10px" }}
+                        onClick={() => loadSynthesis(iv)} disabled={synthId === iv.id}>
+                        {synthId === iv.id ? <><span className="spinner" /> Summarising…</> : "✦ AI Panel Summary"}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[iv.status] || "#8a7e72", background: `${STATUS_COLOR[iv.status] || "#8a7e72"}18`, padding: "2px 8px", borderRadius: 20 }}>

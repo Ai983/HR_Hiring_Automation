@@ -40,11 +40,16 @@ Write a concise panel feedback summary (3-4 sentences) that captures the overall
 
     const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}` },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("OPEN_API") || Deno.env.get("OPENAI_API_KEY")}` },
       body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "user", content: prompt }], max_tokens: 300 }),
     });
 
     const aiData = await aiRes.json();
+    if (!aiData?.choices?.[0]) {
+      const openaiError = aiData?.error?.message || "OpenAI returned no completion.";
+      return new Response(JSON.stringify({ error: `AI service error: ${openaiError}` }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const summary = aiData.choices[0].message.content.trim();
 
     return new Response(JSON.stringify({ summary, average_score: parseFloat(avg.toFixed(1)) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

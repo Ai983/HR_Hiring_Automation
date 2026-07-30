@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { fetchAllPendingReferences, createReference, updateReference } from "../../services/referenceService.js";
 import { updateApplicantStage } from "../../services/applicantService.js";
+import { summarizeReference } from "../../services/aiService.js";
+
+const VERDICT_COLORS = { STRONG_HIRE: "#10b981", HIRE: "#22c55e", HOLD: "#f59e0b", NO_HIRE: "#ef4444" };
+
+// The model returns these as either a string or a list depending on the run —
+// normalise so the panel never crashes on .join().
+const asText = (v) => (Array.isArray(v) ? v.filter(Boolean).join(" · ") : (v || "").toString().trim());
 
 const OVERLAY = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
 const MODAL = { background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 500, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" };
@@ -17,6 +24,17 @@ export default function ReferenceCheck() {
   const [saving, setSaving] = useState(false);
   const [addForm, setAddForm] = useState({ referee_name: "", referee_designation: "", referee_company: "", referee_phone: "", referee_email: "", relationship: "Direct Manager" });
   const [logForm, setLogForm] = useState({ reference_status: "contacted", feedback_rating: 4, feedback_notes: "", checked_by: "HR" });
+  const [summary, setSummary] = useState({});   // applicantId -> AI verdict
+  const [summId, setSummId]   = useState(null);
+
+  async function loadSummary(applicantId) {
+    setSummId(applicantId);
+    try {
+      const result = await summarizeReference(applicantId);
+      setSummary((s) => ({ ...s, [applicantId]: result }));
+    } catch (e) { showToast(e.message || "Could not summarise the references.", false); }
+    setSummId(null);
+  }
 
   useEffect(() => { load(); }, []);
 
@@ -96,7 +114,37 @@ export default function ReferenceCheck() {
         ) : (
           Object.entries(groupedByApplicant).map(([id, grp]) => (
             <div key={id} className="card" style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>{grp.name} <span style={{ color: "#8a7e72", fontWeight: 400, fontSize: 12 }}>— {grp.role}</span></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{grp.name} <span style={{ color: "#8a7e72", fontWeight: 400, fontSize: 12 }}>— {grp.role}</span></div>
+                {!summary[id] && (
+                  <button className="btn-outline" style={{ fontSize: 11, padding: "3px 10px" }}
+                    onClick={() => loadSummary(id)} disabled={summId === id}>
+                    {summId === id ? <><span className="spinner" /> Summarising…</> : "✦ AI Reference Summary"}
+                  </button>
+                )}
+              </div>
+
+              {summary[id] && (
+                <div style={{ background: "#faf8f5", borderRadius: 10, padding: "12px 14px", marginBottom: 12, fontSize: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontWeight: 800, fontSize: 11, padding: "2px 9px", borderRadius: 20,
+                      color: VERDICT_COLORS[summary[id].overall_verdict] || "#8a7e72",
+                      background: `${VERDICT_COLORS[summary[id].overall_verdict] || "#8a7e72"}18` }}>
+                      {String(summary[id].overall_verdict || "—").replace(/_/g, " ")}
+                    </span>
+                    <span style={{ color: "#8a7e72" }}>
+                      {summary[id].ref_count} reference(s) · avg ★ {summary[id].average_rating}/5
+                    </span>
+                  </div>
+                  {summary[id].summary && <div style={{ color: "#1a1612", marginBottom: 6 }}>{summary[id].summary}</div>}
+                  {asText(summary[id].consistent_strengths) && (
+                    <div style={{ color: "#16a34a" }}>✓ {asText(summary[id].consistent_strengths)}</div>
+                  )}
+                  {asText(summary[id].red_flags) && !/^none/i.test(asText(summary[id].red_flags)) && (
+                    <div style={{ color: "#dc2626", marginTop: 2 }}>⚠ {asText(summary[id].red_flags)}</div>
+                  )}
+                </div>
+              )}
               {grp.refs.map((r) => (
                 <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #f0ece5" }}>
                   <div style={{ flex: 1 }}>

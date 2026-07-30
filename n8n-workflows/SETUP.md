@@ -221,3 +221,49 @@ Employee probation ending in ≤30 days
 - **Supabase URL:** https://sgerslbmnwrltqrhsdir.supabase.co
 - **Maytapi Phone ID:** 46821
 - **Maytapi Product ID:** b8cce1b9-0f9f-4aef-994c-d232716471f0
+
+---
+
+## 2026-07-30 — Hub re-point
+
+All workflows previously pointed at the **retired** project `sgerslbmnwrltqrhsdir`.
+They now target the hub `tpfvnerrjhqwipyonngf`, where the HireFlow tables live in
+the **`hr` schema** — not `public`.
+
+Three things changed, and all three are required:
+
+| Change | Why |
+|---|---|
+| URL → `https://tpfvnerrjhqwipyonngf.supabase.co` | old project is retired |
+| `Accept-Profile: hr` on reads, `Content-Profile: hr` on writes | tables are in `hr`; without this PostgREST returns **404 `Could not find the table 'public.<x>'`** |
+| **service-role** key, not anon | `hr` tables are RLS-protected — the anon key now returns 0 rows |
+
+Swapping only the URL is not enough. Verified against the live hub: the same
+query without `Accept-Profile: hr` 404s, and with the anon key returns 0 rows.
+
+### Keys are no longer stored in this repo
+The committed Supabase keys were replaced with `__HUB_SERVICE_ROLE_KEY__`.
+Before importing any of these JSON files, replace that placeholder with the hub
+service-role key — or better, attach the existing **"Supabase Hub"** n8n
+credential (`httpHeaderAuth`) and drop the inline `apikey`/`Authorization`
+headers, keeping only `Accept-Profile` / `Content-Profile`.
+
+> The retired project's service-role key was previously committed here in
+> plaintext. It has been removed, but treat it as leaked and **rotate/delete the
+> old `sgerslbmnwrltqrhsdir` project** if it still holds candidate data.
+
+### Status after the re-point
+
+| Workflow | Live in n8n | Re-pointed | Still needs |
+|---|---|---|---|
+| 05 Callback Reminder | `CvdyAoacibs5gSnU` | ✅ | `HR_WHATSAPP_NUMBER` variable, then activate |
+| 06 Call Retry | `KxB5dx74mGMZHl6P` | ✅ | activate |
+| 07 Document Reminder | `67x8217oRM9Reme8` | ✅ | activate |
+| 08 Probation Reminder | `5VZO3fRcbTL81cOd` | ✅ | `HR_WHATSAPP_NUMBER` variable, then activate |
+| 03 Acknowledgement | `69yWeTv0vxkxqby3` | n/a — no DB node | a Supabase DB webhook on `hr.applicants` INSERT |
+| Gmail Resume Collector | `1Renlvv0XqU68XN7` | repo JSON only | Gmail OAuth2 credential attached to the live workflow |
+| WhatsApp Resume Collector | `Yq2faGHEcgLMz3gI` | repo JSON only | Maytapi inbound webhook |
+| Facebook Job Poster / 04 Meta Ads | `Zn8pl2qdNa1kYac2` | repo JSON only | Meta app credentials |
+
+All eight remain **inactive**. Activating them sends real WhatsApp messages to
+real candidates, so that is a deliberate go-live step, not a config detail.

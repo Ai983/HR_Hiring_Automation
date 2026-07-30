@@ -18,26 +18,48 @@
       "name": "Schedule — Every 2 Days at 9 AM IST",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "notes": "Runs at 3:30 AM UTC = 9:00 AM IST"
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "https://sgerslbmnwrltqrhsdir.supabase.co/rest/v1/joinings",
+        "url": "https://tpfvnerrjhqwipyonngf.supabase.co/rest/v1/joinings",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "status", "value": "in.(pre_joining,doc_pending,doc_submitted)" },
-            { "name": "select", "value": "*,applicants(full_name,phone,email)" },
-            { "name": "order", "value": "joining_date.asc" }
+            {
+              "name": "status",
+              "value": "in.(pre_joining,doc_pending,doc_submitted)"
+            },
+            {
+              "name": "select",
+              "value": "*,applicants(full_name,phone,email)"
+            },
+            {
+              "name": "order",
+              "value": "joining_date.asc"
+            }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZXJzbGJtbndybHRxcmhzZGlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzMwOTg5MCwiZXhwIjoyMDg4ODg1ODkwfQ.Mh3gUYmwu-aX8xqLFwLN5ssbLYd88r8B0K0-PJGqoDE" }
+            {
+              "name": "apikey",
+              "value": "__HUB_SERVICE_ROLE_KEY__"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer __HUB_SERVICE_ROLE_KEY__"
+            },
+            {
+              "name": "Accept-Profile",
+              "value": "hr"
+            }
           ]
         },
         "options": {}
@@ -46,7 +68,10 @@
       "name": "Supabase — Fetch Joiners with Pending Docs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300]
+      "position": [
+        480,
+        300
+      ]
     },
     {
       "parameters": {
@@ -56,7 +81,10 @@
       "name": "Format Doc Reminders",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
@@ -65,8 +93,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-maytapi-key", "value": "ebfd5e67-6403-4921-b300-a54364f2c470" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "x-maytapi-key",
+              "value": "ebfd5e67-6403-4921-b300-a54364f2c470"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -78,18 +112,45 @@
       "name": "Maytapi — Send Doc Reminder to Joiner",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 300]
+      "position": [
+        960,
+        300
+      ]
     }
   ],
   "connections": {
     "Schedule — Every 2 Days at 9 AM IST": {
-      "main": [[{ "node": "Supabase — Fetch Joiners with Pending Docs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Supabase — Fetch Joiners with Pending Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Supabase — Fetch Joiners with Pending Docs": {
-      "main": [[{ "node": "Format Doc Reminders", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Format Doc Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Format Doc Reminders": {
-      "main": [[{ "node": "Maytapi — Send Doc Reminder to Joiner", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Maytapi — Send Doc Reminder to Joiner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -98,5 +159,15 @@
     "saveManualExecutions": true
   },
   "id": "doc-reminder-v1",
-  "tags": [{ "name": "hagerstone" }, { "name": "onboarding" }, { "name": "documents" }]
+  "tags": [
+    {
+      "name": "hagerstone"
+    },
+    {
+      "name": "onboarding"
+    },
+    {
+      "name": "documents"
+    }
+  ]
 }

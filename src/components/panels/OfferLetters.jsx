@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useApp } from "../../context/AppContext.jsx";
-import { fetchOffers, createOffer, updateOffer, computeCtcBreakup } from "../../services/offerService.js";
+import { fetchOffers, createOffer, updateOffer, computeCtcBreakup, uploadOfferLetter, signedOfferLetterUrl } from "../../services/offerService.js";
 import { updateApplicantStage } from "../../services/applicantService.js";
+import { generateOfferLetter } from "../../services/aiService.js";
+import { buildOfferLetterDocx } from "../../services/offerLetterDoc.js";
 
 const OVERLAY = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
 const MODAL = { background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 540, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" };
@@ -21,6 +23,7 @@ export default function OfferLetters() {
   const [joiningDate, setJoiningDate] = useState("");
   const [probation, setProbation] = useState(6);
   const [preview, setPreview] = useState(null);
+  const [genId, setGenId] = useState(null);   // offer currently generating a letter
 
   useEffect(() => { load(); }, []);
 
@@ -54,6 +57,45 @@ export default function OfferLetters() {
       showToast("Offer created. Candidate stays in Offer until they accept.");
     } catch (e) { showToast(e.message, false); }
     setSaving(false);
+  }
+
+  // AI writes only the welcome paragraph; every figure comes from ctc_breakup.
+  async function makeLetter(offer) {
+    setGenId(offer.id);
+    try {
+      const { welcome_paragraph } = await generateOfferLetter({
+        candidate_name:    offer.applicants?.full_name,
+        role_title:        offer.applicants?.jobs?.title,
+        joining_date:      offer.joining_date,
+        probation_months:  offer.probation_months,
+      });
+      const blob = await buildOfferLetterDocx(offer, {
+        candidateName:    offer.applicants?.full_name,
+        roleTitle:        offer.applicants?.jobs?.title,
+        welcomeParagraph: welcome_paragraph,
+      });
+      const path = await uploadOfferLetter(offer.id, blob);
+      await updateOffer(offer.id, { offer_letter_url: path, esign_status: "draft" });
+
+      // Hand HR the file immediately as well as storing it.
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Offer Letter - ${offer.applicants?.full_name || "candidate"}.docx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+
+      await load();
+      showToast("Offer letter generated and saved.");
+    } catch (e) {
+      showToast(e.message || "Could not generate the offer letter.", false);
+    }
+    setGenId(null);
+  }
+
+  async function openLetter(offer) {
+    try {
+      window.open(await signedOfferLetterUrl(offer.offer_letter_url), "_blank", "noopener");
+    } catch (e) { showToast(e.message, false); }
   }
 
   async function updateStatus(offer, status) {
@@ -108,7 +150,19 @@ export default function OfferLetters() {
                   <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLORS[o.offer_status], background: `${STATUS_COLORS[o.offer_status]}18`, padding: "2px 8px", borderRadius: 20 }}>
                     {o.offer_status}
                   </span>
-                  <button className="btn-outline" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setDetailModal(o)}>View Breakup</button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn-outline" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => setDetailModal(o)}>View Breakup</button>
+                    {o.offer_letter_url
+                      ? <button className="btn-outline" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => openLetter(o)}>📄 Open Letter</button>
+                      : <button className="btn-outline" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => makeLetter(o)} disabled={genId === o.id}>
+                          {genId === o.id ? <><span className="spinner" /> Generating…</> : "✦ Generate Letter"}
+                        </button>}
+                    {o.offer_letter_url && (
+                      <button className="btn-ghost" style={{ fontSize: 11, padding: "4px 8px" }} onClick={() => makeLetter(o)} disabled={genId === o.id} title="Regenerate">
+                        {genId === o.id ? "…" : "↻"}
+                      </button>
+                    )}
+                  </div>
                   {o.offer_status === "pending" && (
                     <div style={{ display: "flex", gap: 6 }}>
                       <button className="btn-gold" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => updateStatus(o, "accepted")}>Accepted</button>
