@@ -20,3 +20,6 @@ build/
 *.log
 .DS_Store
 sidebar-shot.png
+
+# Source export of the retired HSIPL attendance sheet (contains employee PII)
+Staff Attendance System (HSIPL)*

@@ -1,0 +1,90 @@
+-- ============================================================================
+--  HSIPL ATTENDANCE PARITY — record of what was applied to the hub
+--  Project: tpfvnerrjhqwipyonngf   Applied: 2026-07-30
+--
+--  Replaces the retired "Staff Attendance System (HSIPL)" Google Sheet
+--  (Google Form -> Apps Script -> 12 tabs) with equivalent structures in the
+--  `hr` schema.
+--
+--  ISOLATION GUARANTEE
+--  -------------------
+--  Everything below lives in `hr`. public.employees and every other module's
+--  schema (cps, finance, lcs, delegation, gie) were READ-ONLY throughout.
+--  Verified by a full row-count snapshot of all non-hr tables before and after:
+--  the only delta attributable to this work is supabase_migrations +5.
+--  Shared identity tables were byte-identical (employees=74,
+--  employee_module_access=427, roles=14).
+--
+--  MIGRATIONS APPLIED (in order)
+--    1. hr_attendance_parity_with_hsipl_sheet
+--    2. hr_attendance_day_and_month_rollups
+--    3. hr_leave_roster_support_and_source
+--    4. hr_attendance_day_with_date_spine
+--    5. hr_attendance_day_include_future_approved_leave
+--
+--  NEW OBJECTS
+--    hr.sites                 45 site/office pick-list (was a Form dropdown)
+--    hr.attendance_person     HR-only roster for people with no hub account
+--    hr.holidays              holiday calendar (was the Setting tab)
+--    hr.attendance_settings   shift 08:00-19:00, late 09:30, OT past 9h, weekends
+--    hr.attendance_remarks    monthly remarks (was the Remarks tab)
+--    hr.attendance_subject    view: hub employee OR roster person, unified
+--    hr.attendance_day        view: replaces BACKHAND + Monthly Attendance
+--    hr.attendance_month      view: replaces the Overtime Sheet header block
+--
+--  COLUMNS ADDED
+--    hr.attendance      site_ref, person_ref, source, site_match,
+--                       site_distance_m, photo_url; employee_id now NULLABLE
+--                       with a XOR check against person_ref
+--    hr.leave_requests  person_ref, source; employee_id/request_to nullable;
+--                       leave_type now also allows short_leave + uninformed
+--    hr.employee_profile planned_days_per_week, works_sunday,
+--                       allowed_leaves_per_month
+--
+--  DATA MIGRATED
+--    17,584 punches      2024-03-08 .. 2026-07-30, all with their photo link
+--                        6,962 linked to hub employees (exact name match only)
+--                        10,622 to the HR roster, pending your name review
+--       908 leave rows   CL 265 / SL 227 / EL 160 / HD 130 / SHL 126
+--        16 Sunday-workers flagged from the Sunday_WE tab
+--        45 sites, 10 holidays
+--
+--  DATE-FORMAT FINDINGS (the sheet was inconsistent)
+--    Attendance Form / Old Data : DD/MM/YYYY, with ONE stray MM/DD row
+--                                (Vicky Tyagi, 2/24/2025) resolved correctly
+--    Leave Data Start Date      : MM/DD/YYYY
+--    Leave Data End Date        : DD/MM/YYYY
+--    The two leave columns agree on single-day rows, which is how the
+--    per-column format was established rather than guessed.
+--
+--  VALIDATED AGAINST THE SHEET'S OWN COMPUTED REPORT
+--    Shivani, July 2026 — sheet vs hr.attendance_month:
+--      working days 25=25 | on time 24=24 | late 1=1
+--      CL 0=0 | EL 0=0 | SL 2=2 | HD 0=0 | SHL 0=0 | UL 0=0
+--    Worked hours also tie out: 9:24am-6:31pm = 547 min, and the sheet's "OT"
+--    flag on that day confirms overtime starts past 9h.
+--
+--  ASSUMPTION TO CONFIRM
+--    SHL (short leave) is treated as 0.25 day, inferred from the Setting tab's
+--    0.75 totals being 3 x SHL. Tell me if a short leave is worth something
+--    different and it is a one-line change.
+--
+--  DELIBERATELY NOT DONE
+--    hr.sites has NO coordinates. A guessed lat/long would falsely flag every
+--    genuine punch at that site as a GPS mismatch. Add real coordinates per
+--    site in the admin UI when you have them; until then site_match records
+--    'no_coords' and nothing is ever blocked.
+-- ============================================================================
+
+-- This file is documentation of applied state. The live definitions are in the
+-- migrations above; re-running them is safe (all are create-or-replace /
+-- if-not-exists). To inspect the current state:
+--
+--   select * from hr.attendance_settings;
+--   select * from hr.sites order by name;
+--   select * from hr.attendance_month where month = date_trunc('month', current_date);
+--   select * from hr.attendance_day where full_name = 'X' order by work_date desc limit 40;
+--
+-- Names still needing a manual link to a hub employee:
+--   select full_name, note from hr.attendance_person
+--   where employee_id is null and note is not null order by full_name;

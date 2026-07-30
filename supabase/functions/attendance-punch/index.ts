@@ -6,7 +6,7 @@
 // ============================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { evaluateGeofence, DEFAULT_GEO_SETTINGS } from "../_shared/geofence.ts";
+import { evaluateGeofence, DEFAULT_GEO_SETTINGS, haversine } from "../_shared/geofence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     const body = await req.json();
-    const { type, latitude, longitude, accuracy, address, selfie_url } = body ?? {};
+    const { type, latitude, longitude, accuracy, address, selfie_url, site_id } = body ?? {};
     if (type !== "check_in" && type !== "check_out") {
       return json({ error: "type must be check_in or check_out." }, 400);
     }
@@ -121,6 +121,31 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── 2b. The employee picks their site (as the old Google Form did). GPS is
+    // a cross-check only: a mismatch is flagged for review, never blocked,
+    // because plenty of sites have no coordinates recorded yet.
+    let pickedSite: { id: string; name: string; latitude: number | null; longitude: number | null; radius_meters: number } | null = null;
+    let siteMatch: string | null = null;
+    let siteDistance: number | null = null;
+
+    if (site_id) {
+      const { data: s } = await supabase
+        .from("sites").select("id, name, latitude, longitude, radius_meters")
+        .eq("id", site_id).single();
+      pickedSite = s ?? null;
+      if (pickedSite) {
+        if (latitude == null || longitude == null) siteMatch = "no_gps";
+        else if (pickedSite.latitude == null || pickedSite.longitude == null) siteMatch = "no_coords";
+        else {
+          siteDistance = Math.round(
+            haversine(latitude, longitude, pickedSite.latitude, pickedSite.longitude),
+          );
+          const slack = Math.min(Math.max(accuracy ?? 0, 0), 3000);
+          siteMatch = siteDistance - slack <= pickedSite.radius_meters ? "ok" : "mismatch";
+        }
+      }
+    }
+
     // ── 3. Build the attendance row (keeps existing row-per-event shape) ──
     const status =
       type === "check_in" ? (isLateIST(now) ? "late" : "present") : "present";
@@ -135,9 +160,15 @@ Deno.serve(async (req) => {
       address: address ?? null,
       selfie_url: selfie_url ?? null,
       status,
+      // what the employee chose
+      site_ref: pickedSite?.id ?? null,
+      site_name: pickedSite?.name ?? (geo ? (geo.matchedSite ?? "Outside") : null),
+      site_match: siteMatch,
+      site_distance_m: siteDistance,
+      // legacy geofence result (only populated for tracked field staff)
       site_id: geo?.matchedSiteId ?? null,
-      site_name: geo ? (geo.matchedSite ?? "Outside") : null,
       location_verified: geo ? geo.verified : true,
+      source: "portal",
     };
 
     const { error: insErr } = await supabase.from("attendance").insert(record);
@@ -166,10 +197,14 @@ Deno.serve(async (req) => {
       type,
       status,
       site_name: record.site_name,
+      site_match: siteMatch,
+      site_distance_m: siteDistance,
       location_verified: verified,
-      message: verified
-        ? message
-        : `${message} Location unconfirmed — recorded and flagged for review.`,
+      message: siteMatch === "mismatch"
+        ? `${message} Your GPS is about ${siteDistance} m from ${pickedSite?.name} — recorded and flagged for review.`
+        : verified
+          ? message
+          : `${message} Location unconfirmed — recorded and flagged for review.`,
     }, 201);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);

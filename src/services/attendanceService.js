@@ -104,3 +104,108 @@ export async function fetchDailySummary(date) {
   }
   return Object.values(map);
 }
+
+// ─── SITES (the 47-entry pick-list the old Google Form had) ──────────────────
+
+export async function fetchSites({ activeOnly = true } = {}) {
+  if (!supabase) return [];
+  let q = supabase.from("sites").select("*").order("name", { ascending: true });
+  if (activeOnly) q = q.eq("active", true);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createSite(site) {
+  const { data, error } = await supabase.from("sites").insert({
+    name: site.name.trim(),
+    code: site.code?.trim() || null,
+    latitude:  site.latitude  === "" || site.latitude  == null ? null : Number(site.latitude),
+    longitude: site.longitude === "" || site.longitude == null ? null : Number(site.longitude),
+    radius_meters: Number(site.radius_meters) || 500,
+    active: site.active ?? true,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSite(id, patch) {
+  const body = {};
+  for (const k of ["name", "code", "active"]) if (patch[k] !== undefined) body[k] = patch[k];
+  for (const k of ["latitude", "longitude"])
+    if (patch[k] !== undefined) body[k] = patch[k] === "" || patch[k] == null ? null : Number(patch[k]);
+  if (patch.radius_meters !== undefined) body.radius_meters = Number(patch.radius_meters) || 500;
+  const { data, error } = await supabase.from("sites").update(body).eq("id", id).select().single();
+  if (error) throw error;
+  return data;
+}
+
+// ─── HOLIDAYS ───────────────────────────────────────────────────────────────
+
+export async function fetchHolidays(year) {
+  if (!supabase) return [];
+  let q = supabase.from("holidays").select("*").order("holiday_date", { ascending: true });
+  if (year) q = q.gte("holiday_date", `${year}-01-01`).lte("holiday_date", `${year}-12-31`);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addHoliday(holiday_date, name) {
+  const { data, error } = await supabase.from("holidays")
+    .upsert({ holiday_date, name: name.trim() }, { onConflict: "holiday_date" }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteHoliday(holiday_date) {
+  const { error } = await supabase.from("holidays").delete().eq("holiday_date", holiday_date);
+  if (error) throw error;
+}
+
+// ─── SHIFT / OT SETTINGS ────────────────────────────────────────────────────
+
+export async function fetchAttendanceSettings() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("attendance_settings").select("*").eq("id", true).single();
+  if (error) throw error;
+  return data;
+}
+
+export async function saveAttendanceSettings(patch) {
+  const { data, error } = await supabase.from("attendance_settings")
+    .update({ ...patch, updated_at: new Date().toISOString() }).eq("id", true).select().single();
+  if (error) throw error;
+  return data;
+}
+
+// ─── DAILY + MONTHLY ROLL-UPS (replaces the sheet's Monthly / Overtime tabs) ─
+
+export async function fetchAttendanceDays({ subjectId, from, to, limit = 2000 } = {}) {
+  if (!supabase) return [];
+  let q = supabase.from("attendance_day").select("*")
+    .order("work_date", { ascending: false }).limit(limit);
+  if (subjectId) q = q.eq("subject_id", subjectId);
+  if (from) q = q.gte("work_date", from);
+  if (to)   q = q.lte("work_date", to);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchAttendanceMonth(month) {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("attendance_month").select("*")
+    .eq("month", month).order("full_name", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/** Everyone attendance can be recorded for: hub employees + HR-roster people. */
+export async function fetchAttendanceSubjects() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("attendance_subject")
+    .select("*").eq("is_active", true).order("full_name", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}

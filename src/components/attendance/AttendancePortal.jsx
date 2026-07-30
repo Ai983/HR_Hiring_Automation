@@ -3,6 +3,7 @@ import { supabase } from "../../supabaseClient.js";
 import { signIn, signOut, getSession, fetchContext } from "../../services/authService.js";
 import { createLeaveRequest, fetchPaidDaysUsedThisMonth } from "../../services/leaveService.js";
 import { fetchGeofences, insertPing } from "../../services/locationService.js";
+import { fetchSites } from "../../services/attendanceService.js";
 import { evaluateGeofence, pillState } from "../../lib/geofence.js";
 import {
   LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
@@ -397,6 +398,8 @@ export default function AttendancePortal() {
   const [error, setError]           = useState("");
   const [showLeave, setShowLeave]   = useState(false);   // leave form open?
   const [leaveDone, setLeaveDone]   = useState(null);    // { days, paidDays, unpaidDays }
+  const [sites, setSites]           = useState([]);      // the 47-site pick-list
+  const [siteId, setSiteId]         = useState("");      // which site I'm at
 
   // Live clock
   useEffect(() => {
@@ -436,6 +439,13 @@ export default function AttendancePortal() {
     fetchLocation();
     loadTodayRecords(emp);
     fetchGeofences({ activeOnly: true }).then(setGeofences).catch(() => {});
+    // The old Google Form made the employee choose their site — keep that, and
+    // remember the last one so a site team isn't re-picking it every morning.
+    fetchSites().then((s) => {
+      setSites(s);
+      const saved = localStorage.getItem("hf_last_site");
+      if (saved && s.some((x) => x.id === saved)) setSiteId(saved);
+    }).catch(() => {});
   };
 
   // Auto-resume an existing Hagerstone Hub session (no re-login each visit).
@@ -511,6 +521,8 @@ export default function AttendancePortal() {
     const record = {
       employee_id: employee.id,
       type:        nextAction,
+      site_ref:    siteId || null,
+      site_name:   sites.find((s) => s.id === siteId)?.name ?? null,
       recorded_at: ts.toISOString(),
       latitude:    location?.lat ?? null,
       longitude:   location?.lng ?? null,
@@ -518,8 +530,11 @@ export default function AttendancePortal() {
       address:     location?.address ?? null,
       selfie_url:  selfieUrl,
       status,
-      site_name:   geo ? (geo.matchedSite ?? "Outside") : null,
-      location_verified: geo ? false : true,   // client-side check is never "verified"
+      // site comes from what the employee picked (above); the geofence result is
+      // only ever advisory here because this path evaluates it client-side.
+      site_match: geo ? (geo.decision === "inside" ? "ok" : "mismatch") : "no_gps",
+      location_verified: false,   // a client-side check is never "verified"
+      source: "portal",
     };
 
     const { error: dbErr } = await supabase.from("attendance").insert(record);
@@ -528,9 +543,12 @@ export default function AttendancePortal() {
   };
 
   const handleSubmit = async () => {
+    if (!siteId) { setError("Please choose the site or office you're at."); return; }
+    if (!selfie) { setError("A photo is required — tap “Take Photo” before submitting."); return; }
     setSubmitting(true); setError("");
     try {
       const ts = new Date();
+      localStorage.setItem("hf_last_site", siteId);
 
       // Upload selfie if captured (still client-side to the public bucket).
       let selfieUrl = null;
@@ -541,6 +559,7 @@ export default function AttendancePortal() {
       const { data, error: fnErr } = await supabase.functions.invoke("attendance-punch", {
         body: {
           type:       nextAction,
+          site_id:    siteId,
           latitude:   location?.lat ?? null,
           longitude:  location?.lng ?? null,
           accuracy:   location?.accuracy ?? null,
@@ -692,6 +711,19 @@ export default function AttendancePortal() {
         </div>
       </div>
 
+      {/* Site / office — required, mirrors the old Google Form's dropdown */}
+      {!allDone && (
+        <div className="ap-form-card" style={{ marginBottom: 12 }}>
+          <label className="ap-label req">
+            Site / Office <span className="ap-hi">(साइट कार्यालय का नाम)</span>
+          </label>
+          <select className="ap-input" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+            <option value="">Choose where you are…</option>
+            {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+      )}
+
       {/* Today's summary */}
       {(checkedInAt || checkedOutAt) && (
         <div className="ap-today-summary">
@@ -718,7 +750,7 @@ export default function AttendancePortal() {
             </div>
           ) : (
             <button className="ap-btn-camera" onClick={() => setShowCamera(true)}>
-              📷 Take Selfie <span className="ap-optional">(optional)</span>
+              📷 Take Photo <span className="ap-optional">(required)</span>
             </button>
           )}
         </div>
@@ -736,7 +768,8 @@ export default function AttendancePortal() {
         <button
           className={`ap-btn-action ${nextAction === "check_in" ? "checkin" : "checkout"}`}
           onClick={handleSubmit}
-          disabled={submitting || locLoading}
+          disabled={submitting || locLoading || !siteId || !selfie}
+          title={!siteId ? "Choose your site first" : !selfie ? "Take a photo first" : ""}
         >
           {submitting
             ? <><span className="ap-spinner" /> Saving…</>
