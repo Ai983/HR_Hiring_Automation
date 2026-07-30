@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchEmployees, setEmployeePin, setTrackLocation } from "../../services/attendanceService.js";
+import { fetchEmployees, setEmployeePin, setTrackLocation, setEmployeeWorkRules, fetchEmployeeProfile } from "../../services/attendanceService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
 // HR settings modal — identity is read-only (synced from the company master);
@@ -9,6 +9,23 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
   const [track, setTrack] = useState(!!emp.track_location);
   const [busy, setBusy]   = useState(false);
   const [err, setErr]     = useState("");
+  // HSIPL sheet parity: planned days, Sunday working, paid-leave allowance
+  const [rules, setRules] = useState({ planned_days_per_week: 6, works_sunday: false, allowed_leaves_per_month: 2.5 });
+  const [rulesLoaded, setRulesLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchEmployeeProfile(emp.id).then((p) => {
+      if (!alive) return;
+      if (p) setRules({
+        planned_days_per_week:    p.planned_days_per_week ?? 6,
+        works_sunday:             !!p.works_sunday,
+        allowed_leaves_per_month: p.allowed_leaves_per_month ?? 2.5,
+      });
+      setRulesLoaded(true);
+    }).catch(() => setRulesLoaded(true));
+    return () => { alive = false; };
+  }, [emp.id]);
 
   const handleSave = async () => {
     if (pin && (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin))) {
@@ -18,6 +35,7 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
     try {
       if (track !== !!emp.track_location) await setTrackLocation(emp.id, track);
       if (pin) await setEmployeePin(emp.id, pin);
+      if (rulesLoaded) await setEmployeeWorkRules(emp.id, rules);
       onSaved();
     } catch (e) {
       setErr(e.message || "Failed to save. Try again.");
@@ -73,6 +91,39 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
             <div style={{ fontSize: 11, color: "#8a7e72", marginTop: 4 }}>
               {emp.pin ? "A PIN is set — the employee can punch attendance." : "No PIN yet — required before this employee can punch attendance."}
             </div>
+          </div>
+
+          <div style={{ height: 1, background: "#e8e2d9", margin: "8px 0" }} />
+          <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 6 }}>
+            Work rules — these drive the monthly attendance and overtime report.
+          </div>
+          <div className="form-grid">
+            <div className="form-field">
+              <label className="form-label">Planned days / week</label>
+              <select className="form-input" value={rules.planned_days_per_week}
+                onChange={(e) => setRules((r) => ({ ...r, planned_days_per_week: +e.target.value }))}>
+                {[5, 6, 7].map((n) => <option key={n} value={n}>{n} days</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label className="form-label">Paid leave / month</label>
+              <input className="form-input" type="number" step="0.5" min="0" max="10"
+                value={rules.allowed_leaves_per_month}
+                onChange={(e) => setRules((r) => ({ ...r, allowed_leaves_per_month: e.target.value }))} />
+            </div>
+          </div>
+          <div className="form-field">
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <input type="checkbox" checked={rules.works_sunday}
+                onChange={(e) => setRules((r) => ({ ...r, works_sunday: e.target.checked }))}
+                style={{ width: 18, height: 18, accentColor: "#e8a24a" }} />
+              <span style={{ fontSize: 13 }}>
+                <strong>Works Sundays</strong>
+                <div style={{ fontSize: 11, color: "#8a7e72", marginTop: 2 }}>
+                  On for site staff who work the weekly day off. Off means Sundays count as a week off, not an absence.
+                </div>
+              </span>
+            </label>
           </div>
 
           <div className="form-field">

@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../supabaseClient.js";
 import { signIn, signOut, getSession, fetchContext } from "../../services/authService.js";
-import { createLeaveRequest, fetchPaidDaysUsedThisMonth } from "../../services/leaveService.js";
+import { createLeaveRequest, fetchPaidDaysUsedThisMonth, fetchLeaveAllowance } from "../../services/leaveService.js";
 import { fetchGeofences, insertPing } from "../../services/locationService.js";
 import { fetchSites } from "../../services/attendanceService.js";
 import { evaluateGeofence, pillState } from "../../lib/geofence.js";
 import {
-  LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
+  LEAVE_TYPES, REQUESTABLE_LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
   countLeaveDays, splitPaidUnpaid,
 } from "../../leaveConfig.js";
 import "./AttendancePortal.css";
@@ -217,36 +217,41 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate]     = useState("");
   const [usedThisMonth, setUsed]  = useState(0);
+  const [allowance, setAllowance] = useState(PAID_LEAVE_PER_MONTH);
   const [loadingBal, setLoadingBal] = useState(true);
   const [busy, setBusy]           = useState(false);
   const [err, setErr]             = useState("");
 
-  const isHalf = LEAVE_TYPES.find((t) => t.value === leaveType)?.isHalf;
+  const typeMeta = LEAVE_TYPES.find((t) => t.value === leaveType);
+  const isFixed  = typeMeta?.fixedDays != null;   // half-day / short-leave: one date only
 
   // Load how many paid days the employee has already used this month.
   useEffect(() => {
     let alive = true;
-    fetchPaidDaysUsedThisMonth(employee.id)
-      .then((d) => { if (alive) { setUsed(d); setLoadingBal(false); } })
+    Promise.all([
+      fetchPaidDaysUsedThisMonth(employee.id),
+      fetchLeaveAllowance(employee.id, PAID_LEAVE_PER_MONTH),
+    ])
+      .then(([used, allow]) => { if (alive) { setUsed(used); setAllowance(allow); setLoadingBal(false); } })
       .catch(() => { if (alive) setLoadingBal(false); });
     return () => { alive = false; };
   }, [employee.id]);
 
   // Half-day leave only spans a single date.
   useEffect(() => {
-    if (isHalf && startDate) setEndDate(startDate);
-  }, [isHalf, startDate]);
+    if (isFixed && startDate) setEndDate(startDate);
+  }, [isFixed, startDate]);
 
   // Live day split for the preview banner.
-  const requestedDays = countLeaveDays(startDate, isHalf ? startDate : endDate, leaveType);
-  const { paidLeft, paidDays, unpaidDays } = splitPaidUnpaid(usedThisMonth, requestedDays);
+  const requestedDays = countLeaveDays(startDate, isFixed ? startDate : endDate, leaveType);
+  const { paidLeft, paidDays, unpaidDays } = splitPaidUnpaid(usedThisMonth, requestedDays, allowance);
 
   const handleSubmit = async () => {
     setErr("");
     if (!requestTo)              { setErr("Please choose who you're requesting leave from."); return; }
     if (!leaveType)             { setErr("Please select a type of leave."); return; }
     if (!startDate)             { setErr("Please pick a start date."); return; }
-    if (!isHalf && !endDate)    { setErr("Please pick an end date."); return; }
+    if (!isFixed && !endDate)   { setErr("Please pick an end date."); return; }
     if (requestedDays <= 0)     { setErr("End date can't be before the start date."); return; }
     if (!reason.trim())         { setErr("Please add a short reason for the leave."); return; }
 
@@ -258,7 +263,7 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
         leave_type:  leaveType,
         reason,
         start_date:  startDate,
-        end_date:    isHalf ? startDate : endDate,
+        end_date:    isFixed ? startDate : endDate,
         total_days:  requestedDays,
         paid_days:   paidDays,
         unpaid_days: unpaidDays,
@@ -285,7 +290,7 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
           <>
             <div className="ap-balance-top">
               <span className="ap-balance-big">{paidLeft}</span>
-              <span className="ap-balance-of">of {PAID_LEAVE_PER_MONTH} paid leave days left this month</span>
+              <span className="ap-balance-of">of {allowance} paid leave days left this month</span>
             </div>
             <div className="ap-balance-sub">
               {paidLeft > 0
@@ -318,8 +323,8 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
         <label className="ap-label req">Type of Leave <span className="ap-hi">(छुट्टी का प्रकार)</span></label>
         <select className="ap-input" value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
           <option value="">Choose…</option>
-          {LEAVE_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>{t.label} ({t.hi})</option>
+          {REQUESTABLE_LEAVE_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.short} — {t.label} ({t.hi})</option>
           ))}
         </select>
       </div>
@@ -338,9 +343,9 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
 
       {/* Dates */}
       <div className="ap-form-card">
-        <label className="ap-label req">{isHalf ? "Date" : "Start Date"}</label>
+        <label className="ap-label req">{isFixed ? "Date" : "Start Date"}</label>
         <input className="ap-input" type="date" min={todayISO()} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        {!isHalf && (
+        {!isFixed && (
           <>
             <label className="ap-label req" style={{ marginTop: 12 }}>End Date</label>
             <input className="ap-input" type="date" min={startDate || todayISO()} value={endDate} onChange={(e) => setEndDate(e.target.value)} />

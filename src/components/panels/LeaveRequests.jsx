@@ -4,7 +4,9 @@ import { fetchLeaveRequests, updateLeaveStatus, deleteLeaveRequest } from "../..
 import { LEAVE_TYPES, APPROVERS, LEAVE_STATUSES, STATUS_META } from "../../leaveConfig.js";
 import { useApp } from "../../context/AppContext.jsx";
 
-const typeLabel     = (v) => LEAVE_TYPES.find((t) => t.value === v)?.label || v;
+const typeMeta      = (v) => LEAVE_TYPES.find((t) => t.value === v);
+const typeLabel     = (v) => { const m = typeMeta(v); return m ? `${m.short} — ${m.label}` : v; };
+const typeShort     = (v) => typeMeta(v)?.short || v;
 const approverLabel = (v) => APPROVERS.find((a) => a.value === v)?.label || v || "—";
 
 function fmtDate(iso) {
@@ -73,6 +75,7 @@ export default function LeaveRequests() {
   const [loading,   setLoading]   = useState(true);
   const [empFilter, setEmpFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter]     = useState("");
   const [review,    setReview]    = useState(null); // { record, action }
 
   useEffect(() => { fetchEmployees().then(setEmployees).catch(() => {}); }, []);
@@ -95,6 +98,8 @@ export default function LeaveRequests() {
     try { await deleteLeaveRequest(rec.id); showToast("Request deleted."); load(); }
     catch { showToast("Failed to delete request."); }
   };
+
+  const shown = typeFilter ? records.filter((r) => r.leave_type === typeFilter) : records;
 
   // Stats
   const pending  = records.filter((r) => r.status === "pending").length;
@@ -142,6 +147,13 @@ export default function LeaveRequests() {
             {employees.map((e) => <option key={e.id} value={e.id}>{e.employee_code} — {e.full_name}</option>)}
           </select>
         </div>
+        <div className="form-field" style={{ minWidth: 150 }}>
+          <label className="form-label">Leave type</label>
+          <select className="form-input" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">All types</option>
+            {LEAVE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.short} — {t.label}</option>)}
+          </select>
+        </div>
         <div className="form-field" style={{ minWidth: 160 }}>
           <label className="form-label">Status</label>
           <select className="form-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -156,7 +168,7 @@ export default function LeaveRequests() {
       <div className="card" style={{ padding: 0, overflow: "auto" }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>Loading requests…</div>
-        ) : records.length === 0 ? (
+        ) : shown.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>No leave requests for the selected filters.</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 980 }}>
@@ -168,7 +180,7 @@ export default function LeaveRequests() {
               </tr>
             </thead>
             <tbody>
-              {records.map((rec) => {
+              {shown.map((rec) => {
                 const sm = STATUS_META[rec.status] || STATUS_META.pending;
                 return (
                   <tr key={rec.id} style={{ borderBottom: "1px solid #f0ece5" }}
@@ -179,7 +191,8 @@ export default function LeaveRequests() {
                       <div style={{ fontSize: 11, color: "#e8a24a", fontFamily: "monospace", marginTop: 1 }}>{rec.employees?.employee_code}</div>
                     </td>
                     <td style={{ padding: "11px 14px", fontSize: 13, color: "#5a5048", whiteSpace: "nowrap" }}>{approverLabel(rec.request_to)}</td>
-                    <td style={{ padding: "11px 14px", fontSize: 13, color: "#1a1612", whiteSpace: "nowrap" }}>{typeLabel(rec.leave_type)}</td>
+                    <td style={{ padding: "11px 14px", fontSize: 13, color: "#1a1612", whiteSpace: "nowrap" }}
+                        title={typeLabel(rec.leave_type)}>{typeShort(rec.leave_type)}</td>
                     <td style={{ padding: "11px 14px", fontSize: 13, color: "#1a1612", whiteSpace: "nowrap" }}>{fmtRange(rec.start_date, rec.end_date)}</td>
                     <td style={{ padding: "11px 14px", fontSize: 13, whiteSpace: "nowrap" }}>
                       <span style={{ fontWeight: 700, color: "#1a1612" }}>{rec.total_days}</span>

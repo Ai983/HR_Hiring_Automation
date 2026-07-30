@@ -6,17 +6,27 @@
 // Paid leave days granted to every employee per CALENDAR MONTH.
 // Anything beyond this in the same month is unpaid (salary deducted).
 // No carry-forward: unused paid days do NOT roll into the next month.
-export const PAID_LEAVE_PER_MONTH = 2;
+// Fallback only. The real figure is per-employee in
+// hr.employee_profile.allowed_leaves_per_month (the HSIPL sheet used 2.5),
+// so always prefer the value passed in from the database.
+export const PAID_LEAVE_PER_MONTH = 2.5;
 
 // Leave types — mirrors the existing Google Form ("Type of leave").
 // `value` is what we store; `label` is what the employee sees.
 // `isHalf` types always count as 0.5 day regardless of the date range.
+// `fixedDays` pins a type to a fraction regardless of the date range.
+// SHL is 0.25 — inferred from the sheet's 0.75 short-leave totals being 3 x SHL.
 export const LEAVE_TYPES = [
-  { value: "casual",    label: "Casual Leave",    hi: "आकस्मिक अवकाश",      isHalf: false },
-  { value: "half_day",  label: "Half Day Leave",  hi: "आधे दिन की छुट्टी",  isHalf: true  },
-  { value: "emergency", label: "Emergency Leave", hi: "आपात छुट्टी",        isHalf: false },
-  { value: "sick",      label: "Sick Leave",      hi: "बीमारी के लिए",      isHalf: false },
+  { value: "casual",      label: "Casual Leave",    short: "CL",  hi: "आकस्मिक अवकाश",      fixedDays: null },
+  { value: "half_day",    label: "Half Day Leave",  short: "HD",  hi: "आधे दिन की छुट्टी",  fixedDays: 0.5  },
+  { value: "short_leave", label: "Short Leave",     short: "SHL", hi: "थोड़े समय की छुट्टी", fixedDays: 0.25 },
+  { value: "emergency",   label: "Emergency Leave", short: "EL",  hi: "आपात छुट्टी",        fixedDays: null },
+  { value: "sick",        label: "Sick Leave",      short: "SL",  hi: "बीमारी के लिए",      fixedDays: null },
+  { value: "uninformed",  label: "Uninformed Leave", short: "UL", hi: "बिना सूचना छुट्टी",   fixedDays: null, adminOnly: true },
 ];
+
+/** Types an employee may request themselves (UL is marked by HR, not applied for). */
+export const REQUESTABLE_LEAVE_TYPES = LEAVE_TYPES.filter((t) => !t.adminOnly);
 
 // Approvers — for now this is just who the request is addressed to.
 // Routing/notifications to these people get wired up later.
@@ -41,7 +51,7 @@ export const STATUS_META = {
 // Half-day leave types always return 0.5.
 export function countLeaveDays(startDate, endDate, leaveType) {
   const meta = LEAVE_TYPES.find((t) => t.value === leaveType);
-  if (meta?.isHalf) return 0.5;
+  if (meta?.fixedDays != null) return meta.fixedDays;
   if (!startDate || !endDate) return 0;
   const s = new Date(startDate + "T00:00:00");
   const e = new Date(endDate + "T00:00:00");
@@ -66,8 +76,8 @@ export function isSameMonth(isoDate, ref = new Date()) {
 //   requestedDays  – days in the request being previewed
 //
 // Returns { paidLeft, paidDays, unpaidDays } for the NEW request.
-export function splitPaidUnpaid(usedThisMonth, requestedDays) {
-  const paidLeft  = Math.max(0, PAID_LEAVE_PER_MONTH - usedThisMonth);
+export function splitPaidUnpaid(usedThisMonth, requestedDays, allowance = PAID_LEAVE_PER_MONTH) {
+  const paidLeft  = Math.max(0, allowance - usedThisMonth);
   const paidDays  = Math.min(requestedDays, paidLeft);
   const unpaidDays = Math.max(0, requestedDays - paidDays);
   return { paidLeft, paidDays, unpaidDays };

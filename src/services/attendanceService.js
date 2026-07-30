@@ -209,3 +209,20 @@ export async function fetchAttendanceSubjects() {
   if (error) throw error;
   return data || [];
 }
+
+/** Per-person work rules from the HSIPL sheet: planned days, Sunday working,
+ *  and the paid-leave allowance ("Allowed Leaves", 2.5 in the sheet). */
+export async function setEmployeeWorkRules(employeeId, { planned_days_per_week, works_sunday, allowed_leaves_per_month }) {
+  const fields = {};
+  if (planned_days_per_week    !== undefined) fields.planned_days_per_week    = Number(planned_days_per_week);
+  if (works_sunday             !== undefined) fields.works_sunday             = !!works_sunday;
+  if (allowed_leaves_per_month !== undefined) fields.allowed_leaves_per_month = Number(allowed_leaves_per_month);
+  return upsertEmployeeProfile(employeeId, fields);
+}
+
+/** The profile row backing those rules (null when none exists yet). */
+export async function fetchEmployeeProfile(employeeId) {
+  if (!supabase || !employeeId) return null;
+  const { data } = await supabase.from("employee_profile").select("*").eq("employee_id", employeeId).maybeSingle();
+  return data || null;
+}
