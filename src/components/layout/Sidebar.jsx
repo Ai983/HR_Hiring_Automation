@@ -58,6 +58,8 @@ export default function Sidebar() {
       label: "Employee Management",
       items: [
         { id: "attendance",    icon: "⏰", label: "Attendance" },
+        { id: "monthly",       icon: "\u{1F4CA}", label: "Monthly Report" },
+        { id: "attsetup",      icon: "⚙", label: "Attendance Setup" },
         { id: "location",      icon: "\u{1F4CD}", label: "Location Tracking" },
         { id: "geofence",      icon: "\u{1F5FA}", label: "Geofence Sites" },
         { id: "leave",         icon: "\u{1F334}", label: "Leave Requests", badge: leaveCount },
