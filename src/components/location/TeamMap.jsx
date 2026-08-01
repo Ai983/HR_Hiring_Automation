@@ -25,16 +25,20 @@ export default function TeamMap({ people = [], geofences = [], height = 480 }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {geofences.map((g) => (
-          <Circle
-            key={g.id}
-            center={[g.latitude, g.longitude]}
-            radius={g.radius_meters}
-            pathOptions={{ color: "#0a66c2", fillColor: "#0a66c2", fillOpacity: 0.08 }}
-          >
-            <Popup>{g.site_name} · {g.radius_meters} m</Popup>
-          </Circle>
-        ))}
+        {geofences.map((g) => {
+          const enforced = g.verified !== false; // rings from fetchSiteRings carry .verified
+          const c = enforced ? "#0a66c2" : "#b45309";
+          return (
+            <Circle
+              key={g.id}
+              center={[g.latitude, g.longitude]}
+              radius={g.radius_meters}
+              pathOptions={{ color: c, fillColor: c, fillOpacity: 0.08, dashArray: enforced ? undefined : "6" }}
+            >
+              <Popup>{g.site_name} · {g.radius_meters} m · {enforced ? "enforced" : "advisory (unverified)"}</Popup>
+            </Circle>
+          );
+        })}
 
         {withCoords.map((p) => (
           <CircleMarker

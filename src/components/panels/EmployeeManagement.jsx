@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchEmployees, setEmployeePin, setTrackLocation, setEmployeeWorkRules, fetchEmployeeProfile } from "../../services/attendanceService.js";
+import { fetchEmployees, setEmployeePin, setTrackLocation, setEmployeeWorkRules, setEmployeeHomeSite, fetchEmployeeProfile, fetchSites } from "../../services/attendanceService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
 // HR settings modal — identity is read-only (synced from the company master);
@@ -12,11 +12,14 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
   // HSIPL sheet parity: planned days, Sunday working, paid-leave allowance
   const [rules, setRules] = useState({ planned_days_per_week: 6, works_sunday: false, allowed_leaves_per_month: 2.5 });
   const [rulesLoaded, setRulesLoaded] = useState(false);
+  const [sites, setSites] = useState([]);
+  const [homeSite, setHomeSite] = useState("");
 
   useEffect(() => {
     let alive = true;
     fetchEmployeeProfile(emp.id).then((p) => {
       if (!alive) return;
+      if (p) setHomeSite(p.home_site_id || "");
       if (p) setRules({
         planned_days_per_week:    p.planned_days_per_week ?? 6,
         works_sunday:             !!p.works_sunday,
@@ -27,6 +30,8 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
     return () => { alive = false; };
   }, [emp.id]);
 
+  useEffect(() => { fetchSites({ activeOnly: false }).then(setSites).catch(() => {}); }, []);
+
   const handleSave = async () => {
     if (pin && (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin))) {
       setErr("PIN must be 4–6 digits."); return;
@@ -36,6 +41,7 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
       if (track !== !!emp.track_location) await setTrackLocation(emp.id, track);
       if (pin) await setEmployeePin(emp.id, pin);
       if (rulesLoaded) await setEmployeeWorkRules(emp.id, rules);
+      if (rulesLoaded) await setEmployeeHomeSite(emp.id, homeSite);
       onSaved();
     } catch (e) {
       setErr(e.message || "Failed to save. Try again.");
@@ -124,6 +130,17 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
                 </div>
               </span>
             </label>
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Home site / office</label>
+            <select className="form-input" value={homeSite} onChange={(e) => setHomeSite(e.target.value)}>
+              <option value="">— none —</option>
+              {sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <div style={{ fontSize: 11, color: "#8a7e72", marginTop: 4 }}>
+              The site this employee normally reports to — pre-selected on their punch screen and used to flag off-site punches.
+            </div>
           </div>
 
           <div className="form-field">

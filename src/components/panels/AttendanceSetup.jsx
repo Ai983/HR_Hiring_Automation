@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useApp } from "../../context/AppContext.jsx";
+import { MapContainer, TileLayer, CircleMarker, Circle, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import {
-  fetchSites, createSite, updateSite,
+  fetchSites, createSite, updateSite, fetchSiteCalibration,
   fetchHolidays, addHoliday, deleteHoliday,
   fetchAttendanceSettings, saveAttendanceSettings,
 } from "../../services/attendanceService.js";
@@ -11,31 +13,74 @@ import {
 // spreadsheet formulas.
 
 const TABS = [
-  { id: "sites",    label: "Sites & Offices" },
-  { id: "holidays", label: "Holidays" },
-  { id: "shift",    label: "Shift & Overtime" },
+  { id: "sites",     label: "Sites & Offices" },
+  { id: "calibrate", label: "Calibrate" },
+  { id: "holidays",  label: "Holidays" },
+  { id: "shift",     label: "Shift & Overtime" },
 ];
 
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+
+// Click-to-place pin for the site geofence (no marker image asset needed).
+function ClickCapture({ onPick }) {
+  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng); } });
+  return null;
+}
+
+function MapPicker({ lat, lng, radius, onPick }) {
+  const hasPin = lat !== "" && lat != null && lng !== "" && lng != null;
+  const center = hasPin ? [Number(lat), Number(lng)] : [28.6139, 77.209];
+  return (
+    <div style={{ height: 260, borderRadius: 10, overflow: "hidden", border: "1px solid #e8e2d9" }}>
+      <MapContainer key={`${center[0].toFixed(4)},${center[1].toFixed(4)}`}
+        center={center} zoom={hasPin ? 16 : 11} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
+        <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <ClickCapture onPick={onPick} />
+        {hasPin && (
+          <>
+            <Circle center={center} radius={Number(radius) || 200} pathOptions={{ color: "#0a66c2", fillColor: "#0a66c2", fillOpacity: 0.08 }} />
+            <CircleMarker center={center} radius={8} pathOptions={{ color: "#fff", weight: 2, fillColor: "#0a66c2", fillOpacity: 1 }} />
+          </>
+        )}
+      </MapContainer>
+    </div>
+  );
+}
 // ─── SITES ───────────────────────────────────────────────────────────────────
 
 function SiteModal({ site, onSaved, onClose }) {
-  const [f, setF] = useState(site ?? { name: "", code: "", latitude: "", longitude: "", radius_meters: 500, active: true });
+  const [f, setF] = useState(site ?? { name: "", code: "", latitude: "", longitude: "", radius_meters: 200, active: true });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [locBusy, setLocBusy] = useState(false);
+  const [geoBusy, setGeoBusy] = useState(false);
 
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const pick = (lat, lng) => setF((p) => ({ ...p, latitude: Number(lat).toFixed(6), longitude: Number(lng).toFixed(6) }));
 
   const useMyLocation = () => {
     if (!navigator.geolocation) { setErr("This browser can't read a location."); return; }
     setLocBusy(true);
     navigator.geolocation.getCurrentPosition(
-      (p) => { setF((x) => ({ ...x, latitude: p.coords.latitude.toFixed(6), longitude: p.coords.longitude.toFixed(6) })); setLocBusy(false); },
+      (p) => { pick(p.coords.latitude, p.coords.longitude); setLocBusy(false); },
       () => { setErr("Could not read your location."); setLocBusy(false); },
       { enableHighAccuracy: true, timeout: 12000 },
     );
+  };
+
+  // Propose a pin from the CPS address (admin confirms/drags on the map).
+  const locateFromAddress = async () => {
+    const addr = (f.address || f.name || "").trim();
+    if (!addr) { setErr("No address to locate — place the pin on the map."); return; }
+    setGeoBusy(true); setErr("");
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&q=${encodeURIComponent(addr)}`, { headers: { "Accept-Language": "en" } });
+      const j = await r.json();
+      if (!j.length) setErr("Couldn't find that address — place the pin on the map manually.");
+      else pick(+j[0].lat, +j[0].lon);
+    } catch { setErr("Geocoding failed — place the pin on the map manually."); }
+    finally { setGeoBusy(false); }
   };
 
   const save = async () => {
@@ -53,7 +98,7 @@ function SiteModal({ site, onSaved, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box" style={{ maxWidth: 520 }}>
+      <div className="modal-box" style={{ maxWidth: 560 }}>
         <div className="modal-hdr">
           <h3 className="modal-title">{site?.id ? "Edit site" : "Add site"}</h3>
           <button className="btn-ghost" onClick={onClose}>✕</button>
@@ -66,7 +111,7 @@ function SiteModal({ site, onSaved, onClose }) {
             </div>
             <div className="form-field">
               <label className="form-label">Code</label>
-              <input className="form-input" value={f.code || ""} onChange={set("code")} placeholder="optional" />
+              <input className="form-input" value={f.code || ""} onChange={set("code")} placeholder="CPS code" />
             </div>
             <div className="form-field">
               <label className="form-label">Active</label>
@@ -78,10 +123,27 @@ function SiteModal({ site, onSaved, onClose }) {
             </div>
           </div>
 
-          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, padding: "10px 13px", fontSize: 12, color: "#92400e" }}>
-            Coordinates are <strong>optional</strong>. With them, a punch here is cross-checked against GPS and a
-            mismatch is flagged for review — it is never blocked. Leave them blank rather than guessing:
-            a wrong coordinate would flag every genuine punch at this site.
+          {f.address && (
+            <div style={{ fontSize: 12, color: "#5a5048", background: "#faf8f5", border: "1px solid #eee5d9", borderRadius: 8, padding: "8px 11px" }}>
+              <strong>CPS address:</strong> {f.address}
+            </div>
+          )}
+
+          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 9, padding: "10px 13px", fontSize: 12, color: "#1e40af" }}>
+            Drop the pin on the map (or use the buttons) to set this site's exact location. Once saved, a punch
+            more than the allowed radius away from a pinned site is <strong>blocked</strong>. Leave it blank to keep the
+            site flag-only (no GPS enforcement) until you're ready.
+          </div>
+
+          <MapPicker lat={f.latitude} lng={f.longitude} radius={f.radius_meters} onPick={pick} />
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn-outline" onClick={useMyLocation} disabled={locBusy}>
+              {locBusy ? "Reading…" : "📍 Use my current location"}
+            </button>
+            <button className="btn-outline" onClick={locateFromAddress} disabled={geoBusy}>
+              {geoBusy ? "Locating…" : "🔎 Locate from address"}
+            </button>
           </div>
 
           <div className="form-grid">
@@ -96,12 +158,9 @@ function SiteModal({ site, onSaved, onClose }) {
             <div className="form-field">
               <label className="form-label">Allowed radius (m)</label>
               <input className="form-input" type="number" min={50} max={5000}
-                value={f.radius_meters ?? 500} onChange={set("radius_meters")} />
+                value={f.radius_meters ?? 200} onChange={set("radius_meters")} />
             </div>
           </div>
-          <button className="btn-outline" style={{ alignSelf: "flex-start" }} onClick={useMyLocation} disabled={locBusy}>
-            {locBusy ? "Reading…" : "📍 Use my current location"}
-          </button>
           {err && <div style={{ background: "#fff1f0", border: "1px solid #fecaca", borderRadius: 9, padding: "10px 13px", fontSize: 13, color: "#dc2626" }}>{err}</div>}
         </div>
         <div className="modal-footer">
@@ -377,6 +436,96 @@ function ShiftTab() {
   );
 }
 
+// ─── CALIBRATE ───────────────────────────────────────────────────────────────
+// Phased rollout: sites start with no coordinates; employees punch from them;
+// this tab shows where those punches cluster so an admin can set a trustworthy
+// pin + radius and mark the site verified — which is what turns blocking ON.
+function CalibrateTab() {
+  const { showToast } = useApp();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await fetchSiteCalibration({ days: 120 })); }
+    catch { showToast("Could not load calibration data."); }
+    finally { setLoading(false); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load]);
+
+  const verify = async (r) => {
+    setSaving(r.site_id);
+    try {
+      await updateSite(r.site_id, {
+        latitude: r.median_lat, longitude: r.median_lng, radius_meters: r.suggested_radius,
+      });
+      showToast(`${r.name} pinned & verified — geofence is now enforced.`);
+      await load();
+    } catch (e) { showToast(e.message || "Could not verify site."); }
+    finally { setSaving(""); }
+  };
+
+  const tight = (r) => r.n_points >= 3 && Number(r.spread_m) <= 250;
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 14, background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af", fontSize: 13 }}>
+        Each row is a site with real punch locations. Review the cluster, then <strong>Set&nbsp;&amp;&nbsp;Verify</strong> to
+        pin it (median of the punches) and switch geofence blocking on. Rows with 3+ tightly-clustered points are safe to verify.
+      </div>
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>Loading…</div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+            <thead><tr style={{ background: "#faf8f5" }}>
+              {["Site", "Punches", "Cluster spread", "Suggested pin", "Radius", "Current", ""].map((h) => (
+                <th key={h} style={{ padding: "10px 13px", textAlign: "left", fontSize: 10, fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: ".4px", color: "#8a7e72", borderBottom: "1px solid #e8e2d9" }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.site_id} style={{ borderBottom: "1px solid #f0ece5" }}>
+                  <td style={{ padding: "9px 13px", fontWeight: 600, fontSize: 13 }}>{r.name}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13 }}>{r.n_points}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13, color: tight(r) ? "#16a34a" : "#b45309" }}>
+                    ±{r.spread_m} m {tight(r) ? "· tight" : "· loose"}
+                  </td>
+                  <td style={{ padding: "9px 13px", fontSize: 12, fontFamily: "monospace" }}>
+                    <a href={`https://maps.google.com/?q=${r.median_lat},${r.median_lng}`} target="_blank" rel="noreferrer" style={{ color: "#0a66c2", textDecoration: "none" }}>
+                      {Number(r.median_lat).toFixed(5)}, {Number(r.median_lng).toFixed(5)}
+                    </a>
+                  </td>
+                  <td style={{ padding: "9px 13px", fontSize: 13 }}>{r.suggested_radius} m</td>
+                  <td style={{ padding: "9px 13px", fontSize: 12 }}>
+                    {r.geocode_confidence === "verified"
+                      ? <span style={{ color: "#16a34a", fontWeight: 700 }}>verified{r.current_dist_m != null ? ` · ${r.current_dist_m}m off` : ""}</span>
+                      : r.latitude != null
+                        ? <span style={{ color: "#b45309" }}>{r.geocode_confidence || "approx"}{r.current_dist_m != null ? ` · ${r.current_dist_m}m off` : ""}</span>
+                        : <span style={{ color: "#b0a898" }}>not set</span>}
+                  </td>
+                  <td style={{ padding: "9px 13px" }}>
+                    <button className="btn-gold" style={{ fontSize: 12, padding: "5px 11px" }}
+                      disabled={saving === r.site_id} onClick={() => verify(r)}>
+                      {saving === r.site_id ? "Saving…" : (r.geocode_confidence === "verified" ? "Re-verify" : "Set & Verify")}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: 30, textAlign: "center", color: "#8a7e72" }}>
+                  No punch coordinates yet. Once employees punch from their sites (with GPS on), clusters appear here.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 export default function AttendanceSetup() {
@@ -400,6 +549,7 @@ export default function AttendanceSetup() {
       {tab === "sites" && <SitesTab />}
       {tab === "holidays" && <HolidaysTab />}
       {tab === "shift" && <ShiftTab />}
+      {tab === "calibrate" && <CalibrateTab />}
     </div>
   );
 }

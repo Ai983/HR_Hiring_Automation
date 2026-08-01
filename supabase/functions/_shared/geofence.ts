@@ -60,7 +60,10 @@ export function evaluateGeofence(
   geofences: Geofence[],
   settings: GeoSettings = DEFAULT_GEO_SETTINGS,
 ): GeoDecision {
-  if (!geofences || geofences.length === 0) {
+  const valid = (geofences ?? []).filter(
+    (g) => typeof g.latitude === "number" && typeof g.longitude === "number",
+  );
+  if (valid.length === 0) {
     return {
       allow: true,
       verified: false,
@@ -72,6 +75,7 @@ export function evaluateGeofence(
       accuracyUsed: 0,
     };
   }
+  geofences = valid;
 
   // 1. Clamp accuracy: a coarse fix earns more slack, a jittery fix a 50m floor.
   const rawAcc = typeof accuracy === "number" && accuracy > 0 ? accuracy : settings.ceiling;

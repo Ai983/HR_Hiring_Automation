@@ -4,7 +4,7 @@ import { SEED_JOBS, SEED_APPLICANTS } from "../constants.js";
 import { useToast } from "../hooks/useToast.js";
 import { fetchJobs } from "../services/jobService.js";
 import { fetchApplicants } from "../services/applicantService.js";
-import { onAuthChange, fetchContext, signIn, signOut } from "../services/authService.js";
+import { onAuthChange, fetchContext, signIn, signOut, consumeSsoHandoff } from "../services/authService.js";
 
 const AppContext = createContext(null);
 
@@ -34,6 +34,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (!supabase) { setJobs(SEED_JOBS); setApplicants(SEED_APPLICANTS); setAuthLoading(false); return; }
+    consumeSsoHandoff(); // adopt a Hub tile hand-off (fires onAuthChange when set)
     // onAuthStateChange fires INITIAL_SESSION immediately with the current session.
     // Defer work out of the callback — calling supabase.* inside it deadlocks the auth lock.
     const unsub = onAuthChange((s) => { setTimeout(() => resolve(s), 0); });

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../../supabaseClient.js";
-import { signIn, signOut, getSession, fetchContext } from "../../services/authService.js";
+import { signIn, signOut, getSession, fetchContext, consumeSsoHandoff } from "../../services/authService.js";
 import { createLeaveRequest, fetchPaidDaysUsedThisMonth, fetchLeaveAllowance } from "../../services/leaveService.js";
-import { fetchGeofences, insertPing } from "../../services/locationService.js";
-import { fetchSites } from "../../services/attendanceService.js";
+import { insertPing } from "../../services/locationService.js";
+import { fetchSites, fetchEmployeeProfile } from "../../services/attendanceService.js";
 import { evaluateGeofence, pillState } from "../../lib/geofence.js";
 import {
   LEAVE_TYPES, REQUESTABLE_LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
@@ -443,13 +443,27 @@ export default function AttendancePortal() {
     setEmployee(emp);
     fetchLocation();
     loadTodayRecords(emp);
-    fetchGeofences({ activeOnly: true }).then(setGeofences).catch(() => {});
     // The old Google Form made the employee choose their site — keep that, and
     // remember the last one so a site team isn't re-picking it every morning.
+    // The same CPS-sourced sites also drive the geofence pill + tracking pings
+    // (only rows that have coordinates count as geofences).
     fetchSites().then((s) => {
       setSites(s);
-      const saved = localStorage.getItem("hf_last_site");
-      if (saved && s.some((x) => x.id === saved)) setSiteId(saved);
+      setGeofences(
+        s.filter((x) => x.latitude != null && x.longitude != null)
+         .map((x) => ({ site_id: x.id, site_name: x.name, latitude: x.latitude, longitude: x.longitude, radius_meters: x.radius_meters ?? 200 })),
+      );
+      // Prefer the employee's assigned home site; fall back to their last pick.
+      fetchEmployeeProfile(emp.id).then((prof) => {
+        const home = prof?.home_site_id;
+        const saved = localStorage.getItem("hf_last_site");
+        const def = (home && s.some((x) => x.id === home)) ? home
+                  : (saved && s.some((x) => x.id === saved)) ? saved : "";
+        if (def) setSiteId(def);
+      }).catch(() => {
+        const saved = localStorage.getItem("hf_last_site");
+        if (saved && s.some((x) => x.id === saved)) setSiteId(saved);
+      });
     }).catch(() => {});
   };
 
@@ -458,6 +472,8 @@ export default function AttendancePortal() {
     let alive = true;
     (async () => {
       if (!supabase) return;
+      await consumeSsoHandoff();        // adopt a Hub tile hand-off, if present
+      if (window.location.hash.includes("sso=")) history.replaceState(null, "", window.location.pathname + window.location.search);
       const sess = await getSession();
       if (!sess || !alive) return;
       const c = await fetchContext();

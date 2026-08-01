@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchLive, fetchLatest, fetchTimeline, fetchTrackedEmployees, fetchGeofences } from "../../services/locationService.js";
+import { fetchLive, fetchLatest, fetchTimeline, fetchTrackedEmployees, fetchSiteRings, fetchSiteDwell } from "../../services/locationService.js";
 import { useApp } from "../../context/AppContext.jsx";
 import TeamMap from "../location/TeamMap.jsx";
 import RouteMap from "../location/RouteMap.jsx";
+import { fetchOutOfSite } from "../../services/attendanceService.js";
 
 const TABS = [
-  { id: "live",     label: "Live" },
-  { id: "map",      label: "Team Map" },
-  { id: "timeline", label: "Timeline" },
+  { id: "live",      label: "Live" },
+  { id: "map",       label: "Team Map" },
+  { id: "sitetime",  label: "Site Time" },
+  { id: "outofsite", label: "Out of Site" },
+  { id: "timeline",  label: "Timeline" },
 ];
 
 function fmtAgo(mins) {
@@ -84,7 +87,7 @@ function MapTab() {
   useEffect(() => {
     (async () => {
       try {
-        const [p, g] = await Promise.all([fetchLatest({ horizonDays: 7 }), fetchGeofences({ activeOnly: true })]);
+        const [p, g] = await Promise.all([fetchLatest({ horizonDays: 7 }), fetchSiteRings()]);
         setPeople(p); setGeos(g);
       } catch { showToast("Failed to load team map."); }
       finally { setLoading(false); }
@@ -117,7 +120,7 @@ function TimelineTab() {
 
   useEffect(() => {
     fetchTrackedEmployees().then((e) => { setEmps(e); if (e[0]) setEmpId(e[0].id); }).catch(() => {});
-    fetchGeofences({ activeOnly: true }).then(setGeos).catch(() => {});
+    fetchSiteRings().then(setGeos).catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -198,6 +201,160 @@ function TimelineTab() {
   );
 }
 
+// ─── OUT OF SITE TAB (punches whose GPS was clearly away from the chosen site) ─
+function OutOfSiteTab() {
+  const { showToast } = useApp();
+  const today = new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState(today.slice(0, 8) + "01");
+  const [to, setTo]     = useState(today);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await fetchOutOfSite({ dateFrom: from, dateTo: to + "T23:59:59" })); }
+    catch { showToast("Failed to load off-site punches."); }
+    finally { setLoading(false); }
+  }, [from, to]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div className="form-field"><label className="form-label">From</label>
+          <input className="form-input" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></div>
+        <div className="form-field"><label className="form-label">To</label>
+          <input className="form-input" type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></div>
+      </div>
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>Loading…</div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+            <thead><tr style={{ background: "#faf8f5" }}>
+              {["When", "Employee", "Punch", "Chosen site", "Distance off", "Map"].map((h) => (
+                <th key={h} style={{ padding: "10px 13px", textAlign: "left", fontSize: 10, fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: ".4px", color: "#8a7e72", borderBottom: "1px solid #e8e2d9" }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} style={{ borderBottom: "1px solid #f0ece5" }}>
+                  <td style={{ padding: "9px 13px", fontSize: 12 }}>{new Date(r.recorded_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13 }}>
+                    <span style={{ fontWeight: 600 }}>{r.employees?.full_name || "—"}</span>
+                    <span style={{ color: "#8a7e72", fontFamily: "monospace", marginLeft: 6, fontSize: 11 }}>{r.employees?.employee_code}</span>
+                  </td>
+                  <td style={{ padding: "9px 13px", fontSize: 12, color: "#5a5048" }}>{r.type === "check_in" ? "Check in" : "Check out"}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13 }}>{r.site_name || "—"}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13, color: "#dc2626", fontWeight: 700 }}>{r.site_distance_m != null ? `${r.site_distance_m} m` : "—"}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 12 }}>
+                    {r.latitude != null
+                      ? <a href={`https://maps.google.com/?q=${r.latitude},${r.longitude}`} target="_blank" rel="noreferrer" style={{ color: "#0a66c2", textDecoration: "none" }}>📍 open</a>
+                      : "—"}
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: 30, textAlign: "center", color: "#8a7e72" }}>
+                  No off-site punches in this range. (Only punches at a verified site can be flagged off-site.)</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SITE TIME TAB (dwell: how long each person stayed at each site) ──────────
+
+function fmtMins(m) {
+  const t = Math.round(Number(m) || 0);
+  const h = Math.floor(t / 60);
+  return h > 0 ? `${h}h ${t % 60}m` : `${t}m`;
+}
+
+function SiteTimeTab() {
+  const { showToast } = useApp();
+  const today = new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState(today.slice(0, 8) + "01");
+  const [to, setTo]     = useState(today);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await fetchSiteDwell({ from, to })); }
+    catch { showToast("Failed to load site time."); }
+    finally { setLoading(false); }
+  }, [from, to]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load]);
+
+  // Aggregate the per-day rows into per employee + site totals.
+  const map = new Map();
+  for (const r of rows) {
+    const key = r.employee_id + "|" + (r.site_ref || r.site_name || "?");
+    const cur = map.get(key) || { code: r.employee_code, name: r.full_name, site: r.site_name || "—", minutes: 0, sessions: 0, days: new Set() };
+    cur.minutes += Number(r.minutes) || 0;
+    cur.sessions += Number(r.sessions) || 0;
+    cur.days.add(r.day);
+    map.set(key, cur);
+  }
+  const grouped = [...map.values()].map((g) => ({ ...g, days: g.days.size })).sort((a, b) => b.minutes - a.minutes);
+  const totalMins = grouped.reduce((s, g) => s + g.minutes, 0);
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div className="form-field"><label className="form-label">From</label>
+          <input className="form-input" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></div>
+        <div className="form-field"><label className="form-label">To</label>
+          <input className="form-input" type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>Loading…</div>
+      ) : (
+        <div className="card" style={{ padding: 0, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
+            <thead><tr style={{ background: "#faf8f5" }}>
+              {["Employee", "Site", "Days", "Sessions", "Time on site"].map((h) => (
+                <th key={h} style={{ padding: "10px 13px", textAlign: "left", fontSize: 10, fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: ".4px", color: "#8a7e72", borderBottom: "1px solid #e8e2d9" }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {grouped.map((g, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #f0ece5" }}>
+                  <td style={{ padding: "9px 13px", fontSize: 13 }}>
+                    <span style={{ fontWeight: 600 }}>{g.name}</span>
+                    <span style={{ color: "#8a7e72", fontFamily: "monospace", marginLeft: 6, fontSize: 11 }}>{g.code}</span>
+                  </td>
+                  <td style={{ padding: "9px 13px", fontSize: 13 }}>{g.site}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13, color: "#5a5048" }}>{g.days}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13, color: "#5a5048" }}>{g.sessions}</td>
+                  <td style={{ padding: "9px 13px", fontSize: 13, fontWeight: 700 }}>{fmtMins(g.minutes)}</td>
+                </tr>
+              ))}
+              {grouped.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: 30, textAlign: "center", color: "#8a7e72" }}>
+                  No completed check-in→check-out sessions in this range.</td></tr>
+              )}
+            </tbody>
+            {grouped.length > 0 && (
+              <tfoot><tr style={{ background: "#faf8f5", borderTop: "2px solid #e8e2d9" }}>
+                <td colSpan={4} style={{ padding: "10px 13px", fontSize: 12, fontWeight: 700, color: "#5a5048" }}>Total across all staff</td>
+                <td style={{ padding: "10px 13px", fontSize: 13, fontWeight: 800 }}>{fmtMins(totalMins)}</td>
+              </tr></tfoot>
+            )}
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 export default function LocationTracking() {
@@ -227,6 +384,8 @@ export default function LocationTracking() {
 
       {tab === "live"     && <LiveTab />}
       {tab === "map"      && <MapTab />}
+      {tab === "sitetime"  && <SiteTimeTab />}
+      {tab === "outofsite" && <OutOfSiteTab />}
       {tab === "timeline" && <TimelineTab />}
     </div>
   );

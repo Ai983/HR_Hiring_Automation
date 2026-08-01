@@ -25,6 +25,62 @@ roster, performance, etc.) is NOT built yet** — see [Not started](#5-not-start
 
 ---
 
+## 0. Location-verified attendance + Hub integration (2026-08-01)
+
+Built after the 07-30 handoff. Ties attendance to real GPS, sources sites from CPS,
+and surfaces everything in the Hub founder dashboard. **DB + edge fn are already
+applied/deployed to the live hub; only the two front-ends still need deploying.**
+
+### What changed
+- **Sites now come from CPS.** `public.projects` (CPS projects + offices, with
+  `site_address`) are synced into `hr.sites` (59 rows, each with `code`/`address`/
+  `source`). Re-run anytime with `node sync-cps-sites.mjs --write`. New columns on
+  `hr.sites`: `address, project_code, source, geocode_confidence, geocode_provider,
+  geocoded_at` (migration `03-site-geocode.sql`).
+- **Coordinates are ground-truth, not guessed.** Auto-geocoding messy addresses was
+  unreliable, so a site's pin comes from: (1) admin map-pick / “use my location”
+  (→ `verified`), (2) auto-calibration from the first precise punch (→ `approx`),
+  (3) a “locate from address” assist. **Blocking only ever fires on a `verified`
+  pin** — `approx`/unset sites are cross-checked and flagged, never blocked. No
+  false lockouts.
+- **Punch enforcement** (`attendance-punch`, redeployed): the employee picks a site;
+  their GPS must match it. A precise fix clearly outside a verified site's radius is
+  **rejected (400)**; weak GPS / unverified site / no coords → recorded + flagged.
+  Fixed a latent NaN bug that wrongly blocked good fixes when sites had null coords.
+- **Calibration workflow.** Attendance Setup → **Calibrate** tab: per-site punch
+  cluster (count, median centre, spread, suggested radius) → one-click **Set&Verify**
+  turns blocking on. RPC `hr.site_calibration()` (admin-gated). Phased rollout:
+  assign home sites → collect punches → verify → enforce.
+- **Home site** per employee (`hr.employee_profile.home_site_id`), set in HR Settings;
+  pre-selects their site on the punch screen.
+- **Time-on-site + out-of-site** for admins: Location Tracking gained **Site Time**
+  (dwell from check-in→check-out, RPC `hr.site_dwell`, admin-or-self gated) and
+  **Out of Site** tabs; Team Map rings now come from `hr.sites`.
+- **Single-login (SSO).** The Hub tile hands its Supabase session to this app via a
+  URL fragment; the portal adopts it (`consumeSsoHandoff` in `authService.js`) — no
+  second login. Required `detectSessionInURL:false` on the client (the `#sso=` hash
+  was deadlocking the auth lock). Hub side: `ModuleCard` appends the session for
+  modules flagged `sso:true` (attendance, hireflow).
+- **Hub founder dashboard** (`Hagerstone-Hub` repo): new `AttendanceSection` — today's
+  present/late/absent/on-leave/on-site, off-site punches, team last-known positions.
+  Backed by `public.hr_attendance_overview()` (admin/founder-gated, returns null else).
+
+### Migrations added (already applied to live hub)
+`03-site-geocode.sql`, `04-site-dwell.sql`, `05-home-site-calibration.sql`,
+`06-attendance-overview.sql` (all in `supabase/hub-migration/`, idempotent).
+
+### Still to deploy (front-ends only — checkpoint)
+1. **HireFlow** (this repo) → `hr-hiring-automation.vercel.app` (portal + admin).
+2. **Hagerstone-Hub** → its Vercel app (SSO tile hand-off + founder AttendanceSection).
+   Local clone with the changes is at `../Hagerstone-Hub`; push to `Ai983/Hagerstone-Hub`.
+
+### Go-live step (do together)
+Set **Head Office**'s pin: Attendance Setup → Sites → Head Office → drop pin / “use my
+location” at the office → Save (→ `verified`). Blocking is then live for HO. Other
+active sites self-calibrate from first punches; verify them in the Calibrate tab.
+
+---
+
 ## 1. Context & architecture
 
 - **Two backends:**

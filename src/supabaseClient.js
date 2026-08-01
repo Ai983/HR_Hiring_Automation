@@ -5,5 +5,5 @@ const supabaseUrl = (import.meta.env && import.meta.env.VITE_SUPABASE_URL) || ""
 const supabaseAnon = (import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) || "";
 
 // App tables live in the `hr` schema on the hub project — default all queries there.
-export const supabase = supabaseUrl && supabaseAnon ? createClient(supabaseUrl, supabaseAnon, { db: { schema: "hr" } }) : null;
+export const supabase = supabaseUrl && supabaseAnon ? createClient(supabaseUrl, supabaseAnon, { db: { schema: "hr" }, auth: { detectSessionInURL: false, persistSession: true, autoRefreshToken: true } }) : null;
 export { supabaseUrl, supabaseAnon };

@@ -61,11 +61,6 @@ Deno.serve(async (req) => {
     if (empErr || !emp) return json({ error: "Your login isn't linked to an employee record." }, 404);
     if (!emp.is_active) return json({ error: "Employee is inactive." }, 403);
 
-    // HR-specific tracking flag lives in hr.employee_profile.
-    const { data: prof } = await supabase
-      .from("employee_profile").select("track_location").eq("employee_id", emp.id).single();
-    const track_location = prof?.track_location ?? false;
-
     const now = new Date();
 
     // ── 1b. Reject a punch that repeats today's last one ──
@@ -95,53 +90,78 @@ Deno.serve(async (req) => {
       return json({ error: "Please check in before checking out.", duplicate: false }, 409);
     }
 
-    // ── 2. Geofence enforcement — only for tracked employees ──
+    // ── 2. Load active sites once (CPS-sourced pick-list + geofence coords). ──
+    const { data: sites } = await supabase
+      .from("sites")
+      .select("id, name, latitude, longitude, radius_meters, geocode_confidence")
+      .eq("active", true);
+
+    // Advisory only: which authorised site is the GPS actually near? Used for the
+    // block message and the legacy site_id column — not itself a gate.
     let geo = null;
-    if (track_location) {
-      if (latitude == null || longitude == null) {
-        return json({ error: "Location required. Please enable GPS and try again." }, 400);
-      }
-
-      const { data: sites } = await supabase
-        .from("geofence_settings")
-        .select("site_id, site_name, latitude, longitude, radius_meters")
-        .eq("active", true);
-
-      geo = evaluateGeofence(latitude, longitude, accuracy, sites ?? [], DEFAULT_GEO_SETTINGS);
-
-      // Decision #2 (plan §9): no sites configured → allow + flag (never break
-      // attendance mid-rollout). Only a precise off-site lock blocks.
-      if (!geo.allow) {
-        const dist = geo.nearestDist ?? 0;
-        return json({
-          error: `You appear to be about ${dist} m from ${geo.nearestSite ?? "any site"}. ` +
-                 `Please punch from an authorised site.`,
-          decision: geo.decision,
-        }, 400);
-      }
+    if (latitude != null && longitude != null) {
+      geo = evaluateGeofence(
+        latitude, longitude, accuracy,
+        (sites ?? []).map((s) => ({
+          site_id: s.id, site_name: s.name,
+          latitude: s.latitude, longitude: s.longitude,
+          radius_meters: s.radius_meters ?? 200,
+        })),
+        DEFAULT_GEO_SETTINGS,
+      );
     }
 
-    // ── 2b. The employee picks their site (as the old Google Form did). GPS is
-    // a cross-check only: a mismatch is flagged for review, never blocked,
-    // because plenty of sites have no coordinates recorded yet.
-    let pickedSite: { id: string; name: string; latitude: number | null; longitude: number | null; radius_meters: number } | null = null;
+    // ── 2b. Picked-site gate. The employee declares the site they are at; their
+    // GPS must match it. We only ever BLOCK against a coordinate we trust
+    // (geocode_confidence 'verified' — an admin-set/confirmed pin). An unverified
+    // or uncalibrated site is cross-checked and flagged, never blocked. A site
+    // with no coordinates yet self-calibrates from the first precise fix.
+    const SITE_BLOCK_BUFFER = 75; // metres of slack past the padded radius before we reject
+    let pickedSite:
+      | { id: string; name: string; latitude: number | null; longitude: number | null; radius_meters: number; geocode_confidence: string | null }
+      | null = null;
     let siteMatch: string | null = null;
     let siteDistance: number | null = null;
 
-    if (site_id) {
-      const { data: s } = await supabase
-        .from("sites").select("id, name, latitude, longitude, radius_meters")
-        .eq("id", site_id).single();
-      pickedSite = s ?? null;
-      if (pickedSite) {
-        if (latitude == null || longitude == null) siteMatch = "no_gps";
-        else if (pickedSite.latitude == null || pickedSite.longitude == null) siteMatch = "no_coords";
-        else {
-          siteDistance = Math.round(
-            haversine(latitude, longitude, pickedSite.latitude, pickedSite.longitude),
-          );
-          const slack = Math.min(Math.max(accuracy ?? 0, 0), 3000);
-          siteMatch = siteDistance - slack <= pickedSite.radius_meters ? "ok" : "mismatch";
+    if (site_id) pickedSite = (sites ?? []).find((s) => s.id === site_id) ?? null;
+
+    if (pickedSite) {
+      const rawAcc = typeof accuracy === "number" && accuracy > 0 ? accuracy : DEFAULT_GEO_SETTINGS.ceiling;
+      const slack = Math.min(Math.max(rawAcc, DEFAULT_GEO_SETTINGS.floor), DEFAULT_GEO_SETTINGS.ceiling);
+      const goodFix = rawAcc <= DEFAULT_GEO_SETTINGS.trust;
+      const radius = pickedSite.radius_meters ?? 200;
+
+      if (latitude == null || longitude == null) {
+        siteMatch = "no_gps";
+      } else if (pickedSite.latitude == null || pickedSite.longitude == null) {
+        // Seed the site centre from the first precise punch (approx until an admin
+        // verifies it on the map). Guarded on latitude is null to avoid races.
+        if (goodFix) {
+          await supabase.from("sites").update({
+            latitude, longitude,
+            geocode_confidence: "approx",
+            geocode_provider: "calibrated",
+            geocoded_at: new Date().toISOString(),
+          }).eq("id", pickedSite.id).is("latitude", null);
+          siteMatch = "calibrated";
+        } else {
+          siteMatch = "no_coords";
+        }
+      } else {
+        siteDistance = Math.round(haversine(latitude, longitude, pickedSite.latitude, pickedSite.longitude));
+        const outsideBy = siteDistance - slack - radius; // >0 ⇒ beyond the padded edge
+        if (outsideBy <= 0) {
+          siteMatch = "ok";
+        } else if (pickedSite.geocode_confidence === "verified" && goodFix && outsideBy > SITE_BLOCK_BUFFER) {
+          return json({
+            error: `You are about ${siteDistance} m from ${pickedSite.name} (allowed ${radius} m). ` +
+                   `Please check in from the site.`,
+            decision: "site_mismatch",
+            site_name: pickedSite.name,
+            site_distance_m: siteDistance,
+          }, 400);
+        } else {
+          siteMatch = goodFix ? "mismatch" : "weak";
         }
       }
     }
@@ -165,9 +185,9 @@ Deno.serve(async (req) => {
       site_name: pickedSite?.name ?? (geo ? (geo.matchedSite ?? "Outside") : null),
       site_match: siteMatch,
       site_distance_m: siteDistance,
-      // legacy geofence result (only populated for tracked field staff)
+      // nearest authorised site the GPS actually fell in (advisory)
       site_id: geo?.matchedSiteId ?? null,
-      location_verified: geo ? geo.verified : true,
+      location_verified: siteMatch === null ? true : siteMatch === "ok",
       source: "portal",
     };
 

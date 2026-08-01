@@ -19,7 +19,10 @@ export function haversine(lat1, lon1, lat2, lon2) {
 }
 
 export function evaluateGeofence(lat, lng, accuracy, geofences, settings = DEFAULT_GEO_SETTINGS) {
-  if (!geofences || geofences.length === 0) {
+  geofences = (geofences || []).filter(
+    (g) => typeof g.latitude === "number" && typeof g.longitude === "number",
+  );
+  if (geofences.length === 0) {
     return { allow: true, verified: false, decision: "no_sites", matchedSite: null, nearestSite: null, nearestDist: null, accuracyUsed: 0 };
   }
 

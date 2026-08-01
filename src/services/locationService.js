@@ -201,3 +201,30 @@ export async function fetchTrackedEmployees() {
   if (error) throw error;
   return data || [];
 }
+
+// ─── SITE RINGS: active sites that have coordinates (team-map geofence overlay) ─
+export async function fetchSiteRings() {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("sites")
+    .select("id, name, latitude, longitude, radius_meters, geocode_confidence")
+    .eq("active", true)
+    .not("latitude", "is", null);
+  if (error) throw error;
+  return (data || []).map((s) => ({
+    id: s.id,
+    site_name: s.name,
+    latitude: s.latitude,
+    longitude: s.longitude,
+    radius_meters: s.radius_meters ?? 200,
+    verified: s.geocode_confidence === "verified",
+  }));
+}
+
+// ─── DWELL: minutes each employee spent at each site, from check_in→check_out ──
+export async function fetchSiteDwell({ from, to } = {}) {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("site_dwell", { p_from: from, p_to: to });
+  if (error) throw error;
+  return data || [];
+}

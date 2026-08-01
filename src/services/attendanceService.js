@@ -39,6 +39,18 @@ export async function setEmployeeRoster(employeeId, roster) {
   return upsertEmployeeProfile(employeeId, { roster });
 }
 
+export async function setEmployeeHomeSite(employeeId, home_site_id) {
+  return upsertEmployeeProfile(employeeId, { home_site_id: home_site_id || null });
+}
+
+// Per-site calibration stats (median centre + cluster spread) from real punches.
+export async function fetchSiteCalibration({ days = 120, maxAccuracy = 120 } = {}) {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("site_calibration", { p_days: days, p_max_accuracy: maxAccuracy });
+  if (error) throw error;
+  return data || [];
+}
+
 // ─── ATTENDANCE ──────────────────────────────────────────────────────────────
 
 export async function fetchAttendance({ employeeId, dateFrom, dateTo, limit = 200 } = {}) {
@@ -55,6 +67,26 @@ export async function fetchAttendance({ employeeId, dateFrom, dateTo, limit = 20
   if (dateFrom)   q = q.gte("recorded_at", dateFrom);
   if (dateTo)     q = q.lte("recorded_at", dateTo);
 
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+// Punches flagged as off-site (GPS clearly away from the chosen, verified site).
+// Admin-facing (RLS: HR/admin see all, others only their own rows).
+export async function fetchOutOfSite({ dateFrom, dateTo, limit = 300 } = {}) {
+  if (!supabase) return [];
+  let q = supabase
+    .from("attendance")
+    .select(`
+      id, recorded_at, type, site_name, site_distance_m, site_match, latitude, longitude, accuracy, address,
+      employees ( employee_code, full_name, department )
+    `)
+    .eq("site_match", "mismatch")
+    .order("recorded_at", { ascending: false })
+    .limit(limit);
+  if (dateFrom) q = q.gte("recorded_at", dateFrom);
+  if (dateTo)   q = q.lte("recorded_at", dateTo);
   const { data, error } = await q;
   if (error) throw error;
   return data || [];
@@ -117,13 +149,19 @@ export async function fetchSites({ activeOnly = true } = {}) {
 }
 
 export async function createSite(site) {
+  const lat = site.latitude  === "" || site.latitude  == null ? null : Number(site.latitude);
+  const lng = site.longitude === "" || site.longitude == null ? null : Number(site.longitude);
+  const geo = lat != null && lng != null
+    ? { geocode_confidence: "verified", geocode_provider: "manual", geocoded_at: new Date().toISOString() }
+    : {};
   const { data, error } = await supabase.from("sites").insert({
     name: site.name.trim(),
     code: site.code?.trim() || null,
-    latitude:  site.latitude  === "" || site.latitude  == null ? null : Number(site.latitude),
-    longitude: site.longitude === "" || site.longitude == null ? null : Number(site.longitude),
-    radius_meters: Number(site.radius_meters) || 500,
+    latitude: lat,
+    longitude: lng,
+    radius_meters: Number(site.radius_meters) || 200,
     active: site.active ?? true,
+    ...geo,
   }).select().single();
   if (error) throw error;
   return data;
@@ -134,7 +172,20 @@ export async function updateSite(id, patch) {
   for (const k of ["name", "code", "active"]) if (patch[k] !== undefined) body[k] = patch[k];
   for (const k of ["latitude", "longitude"])
     if (patch[k] !== undefined) body[k] = patch[k] === "" || patch[k] == null ? null : Number(patch[k]);
-  if (patch.radius_meters !== undefined) body.radius_meters = Number(patch.radius_meters) || 500;
+  if (patch.radius_meters !== undefined) body.radius_meters = Number(patch.radius_meters) || 200;
+  // An admin who sets/edits coordinates is declaring ground truth: mark them
+  // 'verified' so the punch geofence will actually enforce (block) against them.
+  // Clearing coordinates clears the confidence so the site reverts to flag-only.
+  if (body.latitude !== undefined || body.longitude !== undefined) {
+    if (body.latitude != null && body.longitude != null) {
+      body.geocode_confidence = "verified";
+      body.geocode_provider = "manual";
+      body.geocoded_at = new Date().toISOString();
+    } else {
+      body.geocode_confidence = null;
+      body.geocoded_at = null;
+    }
+  }
   const { data, error } = await supabase.from("sites").update(body).eq("id", id).select().single();
   if (error) throw error;
   return data;
