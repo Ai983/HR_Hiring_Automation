@@ -447,6 +447,15 @@ export default function AttendancePortal() {
     setEmployee(emp);
     fetchLocation();
     loadTodayRecords(emp);
+    // The auth context only carries id/name/code — pull phone/department from the
+    // employees table so attendance & leave WhatsApp notifications can reach them.
+    supabase
+      .from("employees")
+      .select("phone, department, designation")
+      .eq("id", emp.id)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setEmployee((prev) => (prev ? { ...prev, ...data } : prev)); })
+      .catch(() => {});
     // The old Google Form made the employee choose their site — keep that, and
     // remember the last one so a site team isn't re-picking it every morning.
     // The same CPS-sourced sites also drive the geofence pill + tracking pings
