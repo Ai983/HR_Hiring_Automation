@@ -1,22 +1,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// WHATSAPP NOTIFICATIONS (MayTAPI)
+// WHATSAPP NOTIFICATIONS (PlumbLine in-house gateway)
 // Sends automated WhatsApp messages for attendance check-in/out and leave
-// requests. Calls the MayTAPI cloud API directly (CORS is enabled on their
-// endpoint). Config comes from Vite env with a safe committed fallback so the
-// build always works; override via VITE_MAYTAPI_* in .env when needed.
+// requests via the self-hosted PlumbLine gateway (Maytapi-compatible API, CORS
+// enabled). Config comes from Vite env with a safe committed fallback so the
+// build always works; override via VITE_WA_GATEWAY_* in .env when needed.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { LEAVE_TYPES, APPROVERS } from "../leaveConfig.js";
 
 const env = (typeof import.meta !== "undefined" && import.meta.env) || {};
 
-const PRODUCT_ID = env.VITE_MAYTAPI_PRODUCT_ID || "b8cce1b9-0f9f-4aef-994c-d232716471f0";
-const PHONE_ID   = env.VITE_MAYTAPI_PHONE_ID   || "46821";
-const TOKEN      = env.VITE_MAYTAPI_TOKEN      || "ebfd5e67-6403-4921-b300-a54364f2c470";
+// PlumbLine gateway. SESSION_ID = the connected WhatsApp session ("phoneId");
+// the "product" path segment is accepted but ignored by the gateway.
+const GATEWAY_URL = (env.VITE_WA_GATEWAY_URL || "https://wa-gateway-production-26c1.up.railway.app").replace(/\/+$/, "");
+const GATEWAY_KEY = env.VITE_WA_GATEWAY_KEY || "dbd7cee5c62d54e2738b9e4c1485b91c0c02d40f4946a025f1cca6a8e17abdfd";
+const SESSION_ID  = env.VITE_WA_SESSION_ID || "hagerstone-biz";
 
-const API_URL = `https://api.maytapi.com/api/${PRODUCT_ID}/${PHONE_ID}/sendMessage`;
+const API_URL = `${GATEWAY_URL}/maytapi/hagerstone/${SESSION_ID}/sendMessage`;
 
-// Normalise an Indian mobile number to MayTAPI's expected "91XXXXXXXXXX" form.
+// Normalise an Indian mobile number to the gateway's "91XXXXXXXXXX" form.
 // Accepts "+91 98…", "098…", "98…", "9198…" etc. Returns null when unusable.
 function normalizeNumber(raw) {
   if (!raw) return null;
@@ -38,7 +40,7 @@ export async function sendWhatsApp(number, message) {
   try {
     const res = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-maytapi-key": TOKEN },
+      headers: { "Content-Type": "application/json", "x-maytapi-key": GATEWAY_KEY },
       body: JSON.stringify({ to_number: to, type: "text", message }),
     });
     const body = await res.json().catch(() => ({}));
