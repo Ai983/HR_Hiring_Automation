@@ -5,6 +5,7 @@ import { createLeaveRequest, fetchPaidDaysUsedThisMonth, fetchLeaveAllowance } f
 import { insertPing } from "../../services/locationService.js";
 import { fetchSites, fetchEmployeeProfile } from "../../services/attendanceService.js";
 import { evaluateGeofence, pillState } from "../../lib/geofence.js";
+import { notifyAttendance, notifyLeaveRequest } from "../../services/whatsappService.js";
 import {
   LEAVE_TYPES, REQUESTABLE_LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
   countLeaveDays, splitPaidUnpaid,
@@ -257,7 +258,7 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
 
     setBusy(true);
     try {
-      await createLeaveRequest({
+      const leavePayload = {
         employee_id: employee.id,
         request_to:  requestTo,
         leave_type:  leaveType,
@@ -267,7 +268,10 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
         total_days:  requestedDays,
         paid_days:   paidDays,
         unpaid_days: unpaidDays,
-      });
+      };
+      await createLeaveRequest(leavePayload);
+      // Fire WhatsApp notifications (approver + employee); never block the flow.
+      notifyLeaveRequest(employee, leavePayload).catch(() => {});
       onSubmitted({ days: requestedDays, paidDays, unpaidDays });
     } catch (e) {
       setErr("Couldn't submit your request. Please try again.");
@@ -605,6 +609,14 @@ export default function AttendancePortal() {
       } else if (data?.error) {
         throw new Error(data.error);
       }
+
+      // Fire WhatsApp check-in/out confirmation to the employee; never block the flow.
+      notifyAttendance(employee, {
+        type:    nextAction,
+        time:    ts,
+        status:  result?.status,
+        address: location?.address ?? null,
+      }).catch(() => {});
 
       setSubmitted({
         type: nextAction,

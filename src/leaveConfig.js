@@ -28,11 +28,12 @@ export const LEAVE_TYPES = [
 /** Types an employee may request themselves (UL is marked by HR, not applied for). */
 export const REQUESTABLE_LEAVE_TYPES = LEAVE_TYPES.filter((t) => !t.adminOnly);
 
-// Approvers — for now this is just who the request is addressed to.
-// Routing/notifications to these people get wired up later.
+// Approvers — who the leave request is addressed to, and the WhatsApp number
+// that receives the full request details when an employee submits.
+// `phone` is in international format (91 = India country code) for MayTAPI.
 export const APPROVERS = [
-  { value: "dhruv",   label: "Dhruv Sir"   },
-  { value: "bhaskar", label: "Bhaskar Sir" },
+  { value: "dhruv",   label: "Dhruv Sir",   phone: "919220908364" },
+  { value: "bhaskar", label: "Bhaskar Sir", phone: "919711270051" },
 ];
 
 // Request lifecycle.
