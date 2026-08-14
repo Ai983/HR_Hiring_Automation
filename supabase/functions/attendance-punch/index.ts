@@ -20,11 +20,26 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// IST-aware late check: check-in after 09:30 IST is 'late'.
-function isLateIST(nowUtc: Date): boolean {
+// IST-aware late check. The cutoff is NOT hardcoded: it comes from
+// hr.attendance_settings.late_after, the same row the attendance_day /
+// attendance_month views read. Keep it that way — a second copy of the
+// threshold here means the punch log and the reports disagree about who
+// was late, and only one of them follows the Attendance Setup screen.
+const DEFAULT_LATE_AFTER_MIN = 9 * 60 + 30; // fallback only if the row is missing
+
+// "HH:MM:SS" → minutes past midnight. Returns null on anything unparseable.
+function parseTimeToMinutes(t: unknown): number | null {
+  const m = typeof t === "string" && t.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const h = Number(m[1]), min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+function isLateIST(nowUtc: Date, lateAfterMin: number): boolean {
   const ist = new Date(nowUtc.getTime() + 5.5 * 60 * 60 * 1000);
   const mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  return mins > 9 * 60 + 30;
+  return mins > lateAfterMin;
 }
 
 Deno.serve(async (req) => {
@@ -167,8 +182,18 @@ Deno.serve(async (req) => {
     }
 
     // ── 3. Build the attendance row (keeps existing row-per-event shape) ──
+    // Late cutoff follows Attendance Setup. A failed read must not silently
+    // relabel everyone, so fall back to the documented 09:30 default.
+    let lateAfterMin = DEFAULT_LATE_AFTER_MIN;
+    if (type === "check_in") {
+      const { data: settings } = await supabase
+        .from("attendance_settings")
+        .select("late_after")
+        .maybeSingle();
+      lateAfterMin = parseTimeToMinutes(settings?.late_after) ?? DEFAULT_LATE_AFTER_MIN;
+    }
     const status =
-      type === "check_in" ? (isLateIST(now) ? "late" : "present") : "present";
+      type === "check_in" ? (isLateIST(now, lateAfterMin) ? "late" : "present") : "present";
 
     const record: Record<string, unknown> = {
       employee_id: emp.id,

@@ -244,12 +244,112 @@ export async function fetchAttendanceDays({ subjectId, from, to, limit = 2000 } 
   return data || [];
 }
 
-export async function fetchAttendanceMonth(month) {
+export async function fetchAttendanceMonth(month, { subjectId } = {}) {
   if (!supabase) return [];
-  const { data, error } = await supabase.from("attendance_month").select("*")
+  let q = supabase.from("attendance_month").select("*")
     .eq("month", month).order("full_name", { ascending: true });
+  if (subjectId) q = q.eq("subject_id", subjectId);
+  const { data, error } = await q;
   if (error) throw error;
   return data || [];
+}
+
+// ─── TODAY BOARD (live daily view for HR) ────────────────────────────────────
+
+/** Calendar date in IST as "YYYY-MM-DD". The whole attendance model is IST-day
+ *  based (see attendance_day.work_date), so never use the browser's local date. */
+export function istDate(d = new Date()) {
+  return new Date(d.getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// attendance_day.day_status values that mean "approved away", vs "not a working
+// day at all". Both must be kept out of the not-punched list — chasing someone
+// for missing a punch on a Sunday is exactly the noise that kills a daily board.
+const LEAVE_DAY_STATUS = new Set(["sick", "casual", "emergency", "short_leave", "earned", "unpaid", "on_leave"]);
+const OFF_DAY_STATUS   = new Set(["week_off", "holiday"]);
+
+/**
+ * Who is in, late, still out, and — the one the punch log can't answer —
+ * who has not punched at all today.
+ *
+ * "Expected today" deliberately means *people already using the portal*
+ * (anyone who punched in the last `windowDays`), NOT all 74 active employees.
+ * The roster has no "enrolled in attendance" flag yet, so counting everyone
+ * would bury the 12 real users under 60 colleagues who were never onboarded.
+ * Callers get `enrolled` vs `rosterActive` so the UI can say which it means.
+ */
+export async function fetchTodayBoard(date = istDate(), { windowDays = 14 } = {}) {
+  if (!supabase) return null;
+
+  const since = istDate(new Date(Date.now() - windowDays * 86400000));
+  const [{ data: recent, error: rErr }, allDays, subjects] = await Promise.all([
+    supabase.from("attendance_day").select("subject_id, subject_kind, full_name, employee_code, department")
+      .eq("subject_kind", "employee")
+      .gte("work_date", since).lte("work_date", date),
+    fetchAttendanceDays({ from: date, to: date }),
+    fetchAttendanceSubjects(),
+  ]);
+  if (rErr) throw rErr;
+
+  // Only hub employees belong on this board. hr.attendance_person entries
+  // (subject_kind 'roster') are the imported HSIPL names with no hub login —
+  // they cannot punch, so listing them would park them in "not punched"
+  // permanently and make the one actionable list useless.
+  const days = (allDays || []).filter((d) => d.subject_kind === "employee");
+
+  // Distinct people seen in the window — the set we expect a punch from.
+  const expected = new Map();
+  for (const r of recent || []) {
+    if (!expected.has(r.subject_id)) expected.set(r.subject_id, r);
+  }
+  const todayBy = new Map(days.map((d) => [d.subject_id, d]));
+  // Anyone punching for the first time today still belongs on the board.
+  for (const d of days) if (!expected.has(d.subject_id)) expected.set(d.subject_id, d);
+
+  const rows = [...expected.values()].map((p) => {
+    const d = todayBy.get(p.subject_id) || null;
+    // day_status carries the leave type directly (sick/casual/emergency/…), so
+    // don't rely on leave_type alone — it is null on some leave rows and those
+    // people would be reported as "not punched" on a day they were approved off.
+    let state;
+    if (d?.in_at) state = d.out_at ? "done" : "in";
+    else if (d?.leave_type || LEAVE_DAY_STATUS.has(d?.day_status)) state = "on_leave";
+    else if (OFF_DAY_STATUS.has(d?.day_status)) state = "off";   // Sunday / holiday
+    else state = "not_in";
+    return {
+      subject_id: p.subject_id,
+      full_name: p.full_name,
+      employee_code: p.employee_code,
+      department: p.department,
+      state,                                   // not_in | in | done | on_leave
+      late: d?.day_status === "late",
+      in_at: d?.in_at ?? null,
+      out_at: d?.out_at ?? null,
+      worked_minutes: d?.worked_minutes ?? null,
+      ot_minutes: d?.ot_minutes ?? null,
+      site_name: d?.site_name ?? null,
+      flagged: d?.any_unverified === true,
+      leave_type: d?.leave_type ?? null,
+      day_status: d?.day_status ?? null,
+    };
+  })
+    .filter((r) => r.state !== "off")   // week-offs/holidays are not a to-do list
+    .sort((a, b) => (a.in_at || "9").localeCompare(b.in_at || "9") || String(a.full_name).localeCompare(String(b.full_name)));
+
+  return {
+    date,
+    rows,
+    enrolled: rows.length,
+    rosterActive: (subjects || []).filter((s) => s.subject_kind === "employee").length,
+    counts: {
+      in:       rows.filter((r) => r.state === "in").length,
+      done:     rows.filter((r) => r.state === "done").length,
+      not_in:   rows.filter((r) => r.state === "not_in").length,
+      on_leave: rows.filter((r) => r.state === "on_leave").length,
+      late:     rows.filter((r) => r.late).length,
+      flagged:  rows.filter((r) => r.flagged).length,
+    },
+  };
 }
 
 /** Everyone attendance can be recorded for: hub employees + HR-roster people. */

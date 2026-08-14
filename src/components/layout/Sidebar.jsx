@@ -57,6 +57,7 @@ export default function Sidebar() {
       icon: "\u{1F465}",
       label: "Employee Management",
       items: [
+        { id: "today",         icon: "\u{1F4C6}", label: "Today" },
         { id: "attendance",    icon: "⏰", label: "Attendance" },
         { id: "weekly",        icon: "\u{1F5D3}", label: "Weekly Report" },
         { id: "monthly",       icon: "\u{1F4CA}", label: "Monthly Report" },

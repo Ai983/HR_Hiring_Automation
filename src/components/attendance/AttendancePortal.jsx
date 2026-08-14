@@ -5,6 +5,7 @@ import { createLeaveRequest, fetchPaidDaysUsedThisMonth, fetchLeaveAllowance } f
 import { insertPing } from "../../services/locationService.js";
 import { fetchSites, fetchEmployeeProfile } from "../../services/attendanceService.js";
 import { evaluateGeofence, pillState } from "../../lib/geofence.js";
+import AttendanceHistory from "./AttendanceHistory.jsx";
 import { notifyAttendance, notifyLeaveRequest } from "../../services/whatsappService.js";
 import {
   LEAVE_TYPES, REQUESTABLE_LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
@@ -406,6 +407,7 @@ export default function AttendancePortal() {
   const [submitted, setSubmitted]   = useState(null);    // { type, time }
   const [error, setError]           = useState("");
   const [showLeave, setShowLeave]   = useState(false);   // leave form open?
+  const [showHistory, setShowHistory] = useState(false); // "My Attendance" open?
   const [leaveDone, setLeaveDone]   = useState(null);    // { days, paidDays, unpaidDays }
   const [sites, setSites]           = useState([]);      // the 47-site pick-list
   const [siteId, setSiteId]         = useState("");      // which site I'm at
@@ -706,6 +708,29 @@ export default function AttendancePortal() {
     );
   }
 
+  // ── MY ATTENDANCE (read-only) ──
+  // A separate screen, not a change to the punch flow: the portal still opens
+  // straight onto the punch card, exactly as before.
+  if (showHistory) {
+    return (
+      <div className="ap-shell">
+        <div className="ap-header">
+          <button className="ap-logout" onClick={() => setShowHistory(false)}>← Back</button>
+          <div className="ap-header-info" style={{ textAlign: "center" }}>
+            <div className="ap-emp-name">My Attendance</div>
+            <div className="ap-emp-meta">{employee.full_name}</div>
+          </div>
+          <span style={{ width: 68 }} />
+        </div>
+        <AttendanceHistory subjectId={employee.id} />
+        <p className="ap-footer-note" style={{ marginTop: 18 }}>
+          This is your own record, shown for reference only.<br />
+          Contact HR to request any corrections.
+        </p>
+      </div>
+    );
+  }
+
   // ── MAIN ATTENDANCE SCREEN ──
   const allDone = checkedInAt && checkedOutAt;
 
@@ -820,6 +845,16 @@ export default function AttendancePortal() {
               : "🏁 Check Out"}
         </button>
       )}
+
+      {/* My Attendance — read-only view of the employee's own record */}
+      <div className="ap-leave-box" onClick={() => setShowHistory(true)}>
+        <div className="ap-leave-box-icon">📊</div>
+        <div className="ap-leave-box-body">
+          <div className="ap-leave-box-title">My Attendance</div>
+          <div className="ap-leave-box-sub">This month · Days · Late · Overtime · Leaves</div>
+        </div>
+        <div className="ap-leave-box-arrow">→</div>
+      </div>
 
       {/* Leave request box — second action in the portal */}
       <div className="ap-leave-box" onClick={() => setShowLeave(true)}>

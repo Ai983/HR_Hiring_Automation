@@ -10,6 +10,7 @@ import AllJobs from "./components/panels/AllJobs.jsx";
 import Applicants from "./components/panels/Applicants.jsx";
 import Questionnaire from "./components/panels/Questionnaire.jsx";
 import ResumeReport from "./components/panels/ResumeReport.jsx";
+import TodayAttendance from "./components/panels/TodayAttendance.jsx";
 import AttendanceAdmin from "./components/panels/AttendanceAdmin.jsx";
 import MonthlyAttendance from "./components/panels/MonthlyAttendance.jsx";
 import WeeklyAttendance from "./components/panels/WeeklyAttendance.jsx";
@@ -57,7 +58,7 @@ function AppContent() {
   // Land on a permitted panel when the user has attendance but not hireflow.
   useEffect(() => {
     if (!ctx) return;
-    if (!hasModule("hireflow") && hasModule("attendance") && HIRING.has(panel)) setPanel("attendance");
+    if (!hasModule("hireflow") && hasModule("attendance") && HIRING.has(panel)) setPanel("today");
   }, [ctx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (authLoading) return <Splash text="Loading…" />;
@@ -95,6 +96,7 @@ function AppContent() {
               {panel === "questionnaire"&& <Questionnaire />}
               {panel === "report"       && <ResumeReport />}
               {panel === "survey"        && <SurveyLeads />}
+              {panel === "today"        && <TodayAttendance />}
               {panel === "attendance"   && <AttendanceAdmin />}
               {panel === "weekly"       && <WeeklyAttendance />}
               {panel === "monthly"      && <MonthlyAttendance />}
