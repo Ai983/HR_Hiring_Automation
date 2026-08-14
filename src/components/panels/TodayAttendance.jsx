@@ -10,6 +10,12 @@ import { useApp } from "../../context/AppContext.jsx";
 // invisible; here they get a row.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Mirrors hr.is_hr_admin() exactly — keep the two in step. RLS is what actually
+// enforces this; the check here exists only so a non-admin gets told why the
+// board is empty instead of a screen of zeros that looks like a broken feature.
+// Every role has the `attendance` module, so ordinary employees do reach this panel.
+const HR_ADMIN_ROLES = new Set(["admin", "hr", "founder", "management", "ai", "mis"]);
+
 const STATE_META = {
   in:       { label: "Checked in",  bg: "rgba(34,197,94,0.10)",  color: "#16a34a" },
   done:     { label: "Completed",   bg: "rgba(14,165,233,0.10)", color: "#0369a1" },
@@ -90,27 +96,50 @@ function Section({ title, hint, rows, onOpen }) {
 }
 
 export default function TodayAttendance() {
-  const { showToast } = useApp();
+  const { showToast, ctx } = useApp();
+  const isHrAdmin = HR_ADMIN_ROLES.has(String(ctx?.role || "").toLowerCase());
   const [date, setDate] = useState(() => istDate());
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [person, setPerson] = useState(null);
 
   const load = useCallback(async () => {
+    if (!isHrAdmin) { setLoading(false); return; }
     setLoading(true);
     try { setBoard(await fetchTodayBoard(date)); }
     catch { showToast("Could not load today's attendance."); }
     finally { setLoading(false); }
-  }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [date, isHrAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 
   // Refresh while HR watches the morning come in.
   useEffect(() => {
-    if (date !== istDate()) return;      // only poll when viewing today
+    if (!isHrAdmin || date !== istDate()) return;   // only poll when viewing today
     const t = setInterval(load, 60000);
     return () => clearInterval(t);
-  }, [date, load]);
+  }, [date, load, isHrAdmin]);
+
+  if (!isHrAdmin) {
+    return (
+      <div className="fade-in">
+        <div className="page-title">Today</div>
+        <div className="card" style={{ padding: 40, textAlign: "center", maxWidth: 560, margin: "24px auto" }}>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>🔒</div>
+          <div style={{ fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18, color: "#1a1612", marginBottom: 8 }}>
+            This board is for HR and admins
+          </div>
+          <p style={{ fontSize: 13, color: "#8a7e72", lineHeight: 1.6, marginBottom: 0 }}>
+            You're signed in as <strong>{ctx?.name}</strong> ({ctx?.role || "employee"}), so the
+            database only returns your own attendance — the team board would show all zeros.
+            <br /><br />
+            To see your own record, open the attendance portal and tap <strong>My Attendance</strong>.
+            Ask an admin if you need the team view.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const c = board?.counts;
   const rows = board?.rows || [];
