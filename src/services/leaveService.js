@@ -26,12 +26,15 @@ export async function createLeaveRequest(req) {
 }
 
 // Admin list with employee join + optional filters.
+// `phone` is joined so the approve/reject WhatsApp can be sent straight from the
+// admin panel without a second round-trip — and so the number comes from the DB
+// rather than client auth state, which doesn't carry it.
 export async function fetchLeaveRequests({ employeeId, status, dateFrom, dateTo, limit = 500 } = {}) {
   let q = supabase
     .from("leave_requests")
     .select(`
       *,
-      employees ( employee_code, full_name, department, designation )
+      employees ( employee_code, full_name, department, designation, phone )
     `)
     .order("created_at", { ascending: false })
     .limit(limit);

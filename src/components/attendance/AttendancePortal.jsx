@@ -272,7 +272,9 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
         unpaid_days: unpaidDays,
       };
       await createLeaveRequest(leavePayload);
-      // Fire WhatsApp notifications (approver + employee); never block the flow.
+      // Confirm to the employee on WhatsApp; never block the flow. Approvers are
+      // not messaged here — they get the mail below, and the employee hears back
+      // again from notifyLeaveDecision when EA approves or rejects.
       notifyLeaveRequest(employee, leavePayload).catch(() => {});
       // Same for the HR mail to ea@ + systems@ — the old Google Form's email,
       // now sent from the portal.

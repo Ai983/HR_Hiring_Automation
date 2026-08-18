@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchEmployees } from "../../services/attendanceService.js";
 import { fetchLeaveRequests, updateLeaveStatus, deleteLeaveRequest } from "../../services/leaveService.js";
-import { LEAVE_TYPES, APPROVERS, LEAVE_STATUSES, STATUS_META } from "../../leaveConfig.js";
+import { LEAVE_TYPES, APPROVERS, LEAVE_STATUSES, STATUS_META, isLeaveApprover } from "../../leaveConfig.js";
+import { notifyLeaveDecision } from "../../services/whatsappService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
 const typeMeta      = (v) => LEAVE_TYPES.find((t) => t.value === v);
@@ -18,18 +19,35 @@ function fmtRange(s, e) {
   return `${fmtDate(s)} → ${fmtDate(e)}`;
 }
 
-// Approve / Reject modal — captures admin notes + who reviewed.
+// Approve / Reject modal — captures admin notes; the reviewer is the signed-in
+// user, not a typed name. Saving also WhatsApps the employee the outcome.
 function ReviewModal({ record, action, onSave, onClose }) {
+  const { ctx } = useApp();
   const [notes, setNotes] = useState(record.admin_notes || "");
-  const [by, setBy]       = useState(record.reviewed_by || "");
   const [busy, setBusy]   = useState(false);
   const status = action === "approve" ? "approved" : "rejected";
 
+  // Whoever is logged in owns the decision — this used to be a free-text box, so
+  // the audit trail recorded whatever the admin felt like typing.
+  const reviewedBy = ctx?.name || ctx?.email || "HR";
+
   const handleSave = async () => {
     setBusy(true);
-    try { await updateLeaveStatus(record.id, { status, admin_notes: notes, reviewed_by: by }); onSave(); }
-    catch { /* surfaced by parent toast */ }
-    finally { setBusy(false); }
+    try {
+      await updateLeaveStatus(record.id, { status, admin_notes: notes, reviewed_by: reviewedBy });
+    } catch {
+      setBusy(false);
+      onSave({ ok: false });
+      return;
+    }
+    // The decision is committed. Telling the employee is a best-effort follow-up:
+    // sendWhatsApp never throws, but a failure here must not read as a failed
+    // approval — it only changes which toast the panel shows.
+    const res = await notifyLeaveDecision(record.employees, record, {
+      status, admin_notes: notes, reviewed_by: reviewedBy,
+    }).catch(() => ({ success: false }));
+    setBusy(false);
+    onSave({ ok: true, status, notified: !!res?.success });
   };
 
   return (
@@ -47,10 +65,15 @@ function ReviewModal({ record, action, onSave, onClose }) {
               <span style={{ color: "#dc2626", fontWeight: 700 }}> · {record.unpaid_days} unpaid</span>
             )}
             {record.reason && <div style={{ marginTop: 6, fontStyle: "italic", color: "#8a7e72" }}>“{record.reason}”</div>}
+            <div style={{ marginTop: 8, fontSize: 12, color: record.employees?.phone ? "#16a34a" : "#b45309" }}>
+              {record.employees?.phone
+                ? `📲 WhatsApp will be sent to ${record.employees.phone}`
+                : "⚠️ No phone on file — this employee won't be notified automatically."}
+            </div>
           </div>
           <div className="form-field">
             <label className="form-label">Reviewed by</label>
-            <input className="form-input" placeholder="Your name / HR" value={by} onChange={(e) => setBy(e.target.value)} />
+            <div className="form-input" style={{ background: "#faf8f5", color: "#5a5048", cursor: "default" }}>{reviewedBy}</div>
           </div>
           <div className="form-field">
             <label className="form-label">Notes {action === "reject" ? "(reason for rejection)" : "(optional)"}</label>
@@ -69,7 +92,10 @@ function ReviewModal({ record, action, onSave, onClose }) {
 }
 
 export default function LeaveRequests() {
-  const { showToast } = useApp();
+  const { showToast, ctx } = useApp();
+  // Only EA decides leaves. Every other admin role keeps the list, the stats and
+  // the CSV export, but not the Approve / Reject / Change / Delete controls.
+  const canDecide = isLeaveApprover(ctx?.email);
   const [records,   setRecords]   = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -211,18 +237,22 @@ export default function LeaveRequests() {
                       {rec.reviewed_by && <div style={{ fontSize: 10, color: "#b0a898", marginTop: 3 }}>by {rec.reviewed_by}</div>}
                     </td>
                     <td style={{ padding: "11px 14px" }}>
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                        {rec.status === "pending" && (
-                          <>
-                            <button className="btn-ghost" style={{ fontSize: 12, color: "#16a34a" }} onClick={() => setReview({ record: rec, action: "approve" })}>Approve</button>
-                            <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }} onClick={() => setReview({ record: rec, action: "reject" })}>Reject</button>
-                          </>
-                        )}
-                        {rec.status !== "pending" && (
-                          <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setReview({ record: rec, action: rec.status === "approved" ? "reject" : "approve" })}>Change</button>
-                        )}
-                        <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }} onClick={() => handleDelete(rec)}>Del</button>
-                      </div>
+                      {!canDecide ? (
+                        <span style={{ fontSize: 11, color: "#b0a898" }}>View only</span>
+                      ) : (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {rec.status === "pending" && (
+                            <>
+                              <button className="btn-ghost" style={{ fontSize: 12, color: "#16a34a" }} onClick={() => setReview({ record: rec, action: "approve" })}>Approve</button>
+                              <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }} onClick={() => setReview({ record: rec, action: "reject" })}>Reject</button>
+                            </>
+                          )}
+                          {rec.status !== "pending" && (
+                            <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setReview({ record: rec, action: rec.status === "approved" ? "reject" : "approve" })}>Change</button>
+                          )}
+                          <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }} onClick={() => handleDelete(rec)}>Del</button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -236,7 +266,14 @@ export default function LeaveRequests() {
         <ReviewModal
           record={review.record}
           action={review.action}
-          onSave={() => { setReview(null); load(); showToast("Leave request updated."); }}
+          onSave={(res) => {
+            if (!res?.ok) { showToast("Failed to update the request."); return; }
+            setReview(null); load();
+            const word = res.status === "approved" ? "approved" : "rejected";
+            showToast(res.notified
+              ? `Leave ${word} — employee notified on WhatsApp.`
+              : `Leave ${word}, but the WhatsApp could not be sent. Please inform the employee.`);
+          }}
           onClose={() => setReview(null)}
         />
       )}

@@ -136,3 +136,38 @@ export async function notifyLeaveRequest(employee, req) {
   const results = await Promise.all(tasks);
   return results;
 }
+
+// Tell the EMPLOYEE their leave was approved or rejected — the other half of the
+// promise notifyLeaveRequest makes ("You'll be informed once it's reviewed").
+// Fired from the admin panel the moment EA saves a decision.
+//
+// `employee` here is the joined employees row off the leave record, so `phone`
+// comes from the database rather than client auth state — the apply path reads
+// it from a context that back-fills asynchronously and can still be empty.
+//   req:      the leave_requests row (leave_type, start_date, end_date, total_days)
+//   decision: { status: "approved" | "rejected", admin_notes, reviewed_by }
+export async function notifyLeaveDecision(employee, req, { status, admin_notes, reviewed_by }) {
+  if (!employee?.phone) return { success: false, error: "employee has no phone" };
+
+  const approved = status === "approved";
+  const typeLabel = leaveTypeLabel(req.leave_type);
+  const dateRange =
+    req.start_date === req.end_date
+      ? fmtDateHuman(req.start_date)
+      : `${fmtDateHuman(req.start_date)} → ${fmtDateHuman(req.end_date)}`;
+  const total = req.total_days;
+  const note = String(admin_notes || "").trim();
+
+  const message =
+    `${approved ? "✅ *Leave Approved*" : "❌ *Leave Rejected*"}\n\n` +
+    `Hi ${employee.full_name}, your leave request has been ` +
+    `${approved ? "approved" : "rejected"}.\n\n` +
+    `📝 Type: ${typeLabel}\n` +
+    `📅 Dates: ${dateRange}\n` +
+    `⏳ Duration: ${total} ${dayWord(total)}\n` +
+    (reviewed_by ? `👤 Reviewed by: ${reviewed_by}\n` : "") +
+    (note ? `🗒️ Note: ${note}\n` : "") +
+    `\n— Hagerstone HR`;
+
+  return sendWhatsApp(employee.phone, message);
+}

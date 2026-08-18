@@ -42,6 +42,22 @@ export const APPROVERS = [
   { value: "bhaskar", label: "Bhaskar Sir" },
 ];
 
+// Who may actually APPROVE or REJECT a leave request in the admin panel.
+//
+// Deliberately narrower than hr.is_hr_admin() (admin/hr/founder/management/ai/mis):
+// every one of those roles can still open the panel, filter it and export the CSV,
+// but only the addresses listed here see the Approve / Reject buttons. EA owns the
+// decision. Add a second address here to hand someone a backup — it's the single
+// place the rule lives on the client. RLS enforces the same list server-side, so
+// changing this alone does not grant anyone the right to write.
+export const LEAVE_APPROVER_EMAILS = ["ea@hagerstone.com"];
+
+/** Is this signed-in user allowed to approve/reject leave? Pass ctx.email. */
+export function isLeaveApprover(email) {
+  if (!email) return false;
+  return LEAVE_APPROVER_EMAILS.includes(String(email).trim().toLowerCase());
+}
+
 // Request lifecycle.
 export const LEAVE_STATUSES = ["pending", "approved", "rejected", "cancelled"];
 
