@@ -101,9 +101,13 @@ export async function notifyAttendance(employee, { type, time, status, address }
 
 // ─── LEAVE ───────────────────────────────────────────────────────────────────
 
-// Notify BOTH the routed approver (Dhruv/Bhaskar) with full details AND the
-// employee with a submission confirmation. Runs both sends concurrently and
-// returns their results; never throws.
+// Confirm to the EMPLOYEE that their leave request was submitted.
+//
+// Approvers are deliberately NOT messaged on WhatsApp. Leave requests reach
+// management through the email trail instead (notify-leave-email → ea@ and
+// systems@, every request, no routing), so Dhruv and Bhaskar are not pinged
+// personally each time someone applies. Do not re-add an approver send here
+// without checking that decision still holds.
 //   req: { request_to, leave_type, reason, start_date, end_date,
 //          total_days, paid_days, unpaid_days }
 export async function notifyLeaveRequest(employee, req) {
@@ -115,23 +119,7 @@ export async function notifyLeaveRequest(employee, req) {
       : `${fmtDateHuman(req.start_date)} → ${fmtDateHuman(req.end_date)}`;
   const total = req.total_days;
 
-  // 1) Full details to the approver.
-  const approverMsg =
-    `📩 *New Leave Request*\n\n` +
-    `👤 Employee: ${employee.full_name} (${employee.employee_code})\n` +
-    (employee.department ? `🏢 Department: ${employee.department}\n` : "") +
-    (employee.designation ? `💼 Designation: ${employee.designation}\n` : "") +
-    (employee.phone ? `📱 Contact: ${employee.phone}\n` : "") +
-    `\n📝 Type: ${typeLabel}\n` +
-    `📅 Dates: ${dateRange}\n` +
-    `⏳ Duration: ${total} ${dayWord(total)} (${req.paid_days} paid` +
-    (Number(req.unpaid_days) > 0 ? `, ${req.unpaid_days} unpaid` : "") +
-    `)\n` +
-    `💬 Reason: ${req.reason || "—"}\n\n` +
-    `Requested to: ${appr ? appr.label : req.request_to}\n` +
-    `— Hagerstone HR Portal`;
-
-  // 2) Confirmation to the employee.
+  // Confirmation to the employee.
   const employeeMsg =
     `📨 *Leave Request Submitted*\n\n` +
     `Hi ${employee.full_name}, your leave request has been sent to ` +
@@ -143,7 +131,6 @@ export async function notifyLeaveRequest(employee, req) {
     `— Hagerstone HR`;
 
   const tasks = [];
-  if (appr?.phone) tasks.push(sendWhatsApp(appr.phone, approverMsg));
   if (employee?.phone) tasks.push(sendWhatsApp(employee.phone, employeeMsg));
 
   const results = await Promise.all(tasks);

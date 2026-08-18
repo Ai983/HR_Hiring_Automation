@@ -28,12 +28,18 @@ export const LEAVE_TYPES = [
 /** Types an employee may request themselves (UL is marked by HR, not applied for). */
 export const REQUESTABLE_LEAVE_TYPES = LEAVE_TYPES.filter((t) => !t.adminOnly);
 
-// Approvers — who the leave request is addressed to, and the WhatsApp number
-// that receives the full request details when an employee submits.
-// `phone` is in international format (91 = India country code) for MayTAPI.
+// Approvers — who the leave request is addressed to. This is a routing LABEL
+// stored on the request and shown to the employee; it does not trigger a
+// personal notification.
+//
+// The `phone` numbers that used to sit here were removed deliberately: leave
+// requests no longer WhatsApp the approver. Management is notified through the
+// email trail instead (notify-leave-email → ea@ + systems@, every request), so
+// nobody is pinged personally each time someone applies. Re-adding a number
+// here does nothing on its own — see notifyLeaveRequest in whatsappService.js.
 export const APPROVERS = [
-  { value: "dhruv",   label: "Dhruv Sir",   phone: "919220908364" },
-  { value: "bhaskar", label: "Bhaskar Sir", phone: "919711270051" },
+  { value: "dhruv",   label: "Dhruv Sir"   },
+  { value: "bhaskar", label: "Bhaskar Sir" },
 ];
 
 // Request lifecycle.
