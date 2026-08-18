@@ -126,7 +126,11 @@ Deno.serve(async (req) => {
         content: buildBody(leave, link),
       });
     } finally {
-      await client.close().catch(() => {});
+      // denomailer's close() resolves to void, not a promise, so `.catch()` on
+      // it throws a TypeError — and thrown from `finally` that replaces the
+      // outcome of the send, turning a delivered mail into a 500. Wrap it
+      // instead, which is correct whether close() returns a promise or not.
+      try { await client.close(); } catch { /* connection already gone */ }
     }
 
     return json({ ok: true, sent_to: recipients });
