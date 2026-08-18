@@ -7,6 +7,7 @@ import { fetchSites, fetchEmployeeProfile } from "../../services/attendanceServi
 import { evaluateGeofence, pillState } from "../../lib/geofence.js";
 import AttendanceHistory from "./AttendanceHistory.jsx";
 import { notifyAttendance, notifyLeaveRequest } from "../../services/whatsappService.js";
+import { notifyLeaveEmail } from "../../services/emailService.js";
 import {
   LEAVE_TYPES, REQUESTABLE_LEAVE_TYPES, APPROVERS, PAID_LEAVE_PER_MONTH,
   countLeaveDays, splitPaidUnpaid,
@@ -273,6 +274,9 @@ function LeaveForm({ employee, onCancel, onSubmitted }) {
       await createLeaveRequest(leavePayload);
       // Fire WhatsApp notifications (approver + employee); never block the flow.
       notifyLeaveRequest(employee, leavePayload).catch(() => {});
+      // Same for the HR mail to ea@ + systems@ — the old Google Form's email,
+      // now sent from the portal.
+      notifyLeaveEmail(employee, leavePayload).catch(() => {});
       onSubmitted({ days: requestedDays, paidDays, unpaidDays });
     } catch (e) {
       setErr("Couldn't submit your request. Please try again.");

@@ -11,7 +11,12 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const [jobs, setJobs] = useState([]);
   const [applicants, setApplicants] = useState([]);
-  const [panel, setPanel] = useState("dashboard");
+  // ?panel=leave deep-links straight to a panel — used by the "Click Here"
+  // link in the leave-request email so approvers land on Leave Requests.
+  const [panel, setPanel] = useState(() => {
+    if (typeof window === "undefined") return "dashboard";
+    return new URLSearchParams(window.location.search).get("panel") || "dashboard";
+  });
   const [selectedJob, setSelectedJob] = useState(null);
   const [modal, setModal] = useState(null);
   const [loading, setLoading] = useState(false);
