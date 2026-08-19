@@ -149,6 +149,7 @@ Deno.serve(async (req) => {
               B: latest.score_section_b,
               C: latest.score_section_c,
               D: latest.score_section_d,
+              E: latest.score_section_e,
             },
           },
         });
@@ -228,6 +229,7 @@ Deno.serve(async (req) => {
             B: attempt.score_section_b,
             C: attempt.score_section_c,
             D: attempt.score_section_d,
+            E: attempt.score_section_e,
           },
           section_meta: SECTIONS,
         });
@@ -254,6 +256,7 @@ Deno.serve(async (req) => {
           score_section_b: result.sections.B,
           score_section_c: result.sections.C,
           score_section_d: result.sections.D,
+          score_section_e: result.sections.E,
           band: result.band,
           status: "submitted",
           submitted_at: now.toISOString(),

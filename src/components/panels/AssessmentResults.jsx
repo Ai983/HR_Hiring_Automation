@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   fetchAttempts, fetchAttempt, unlockRetake, saveNotes,
-  BANDS, TOTAL_MARKS,
+  BANDS, TOTAL_MARKS, marksFor,
 } from "../../services/assessmentService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
+// Mirrors SECTIONS in supabase/functions/_shared/assessment-bank.ts (v3).
 const SECTION_META = [
-  { key: "score_section_a", id: "A", name: "Numerical Aptitude", count: 5 },
-  { key: "score_section_b", id: "B", name: "Logical Reasoning", count: 5 },
-  { key: "score_section_c", id: "C", name: "Industry Awareness", count: 6 },
-  { key: "score_section_d", id: "D", name: "Situational Judgement", count: 4 },
+  { key: "score_section_a", id: "A", name: "Site Execution", count: 5 },
+  { key: "score_section_b", id: "B", name: "Client Handling", count: 6 },
+  { key: "score_section_c", id: "C", name: "Procedure & Docs", count: 6 },
+  { key: "score_section_d", id: "D", name: "Commercial", count: 4 },
+  { key: "score_section_e", id: "E", name: "Safety & Diagnosis", count: 4 },
 ];
 
 function fmtDT(iso) {
@@ -88,7 +90,7 @@ function ReviewModal({ attemptId, onClose, onChanged }) {
             <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontFamily: "'Fraunces',serif", fontSize: 34, fontWeight: 700, lineHeight: 1 }}>
-                  {row.score_total ?? "—"}<span style={{ fontSize: 16, color: "#8a7e72" }}> / {TOTAL_MARKS}</span>
+                  {row.score_total ?? "—"}<span style={{ fontSize: 16, color: "#8a7e72" }}> / {Array.isArray(row.review) ? row.review.length : marksFor(row.assessment_id)}</span>
                 </div>
                 <div style={{ marginTop: 6 }}><BandPill band={row.band} /></div>
               </div>
@@ -198,18 +200,21 @@ export default function AssessmentResults() {
     ? (submitted.reduce((s, r) => s + (r.score_total || 0), 0) / submitted.length).toFixed(1)
     : "—";
   const strong = submitted.filter((r) => r.band === "STRONG").length;
+  const strongCut = 21; // v3: 21+/25. See bandFor() in assessment-bank.ts.
 
   const exportCSV = () => {
     const rowsOut = [[
-      "Email", "Name", "Attempt", "Score", "Out Of", "Aptitude/5", "Reasoning/5",
-      "Industry/6", "Situational/4", "Band", "Status", "Started", "Submitted",
+      "Email", "Name", "Paper", "Attempt", "Score", "Out Of",
+      ...SECTION_META.map((s) => `${s.name}/${s.count}`),
+      "Band", "Status", "Started", "Submitted",
       "Duration (s)", "Auto Submitted", "Notes",
     ]];
     for (const r of rows) {
       rowsOut.push([
-        r.email, (r.full_name || "").replace(/,/g, ";"), r.attempt_no,
+        r.email, (r.full_name || "").replace(/,/g, ";"),
+        r.assessment_id || "", r.attempt_no,
         r.score_total ?? "", TOTAL_MARKS,
-        r.score_section_a ?? "", r.score_section_b ?? "", r.score_section_c ?? "", r.score_section_d ?? "",
+        ...SECTION_META.map((s) => r[s.key] ?? ""),
         r.band || "", r.status, r.started_at || "", r.submitted_at || "",
         r.duration_seconds ?? "", r.auto_submitted ? "yes" : "no",
         (r.notes || "").replace(/,/g, ";"),
@@ -234,7 +239,7 @@ export default function AssessmentResults() {
       <div className="stat-row" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 20 }}>
         <div className="stat-card s1"><div className="stat-val">{submitted.length}</div><div className="stat-lbl">Papers Submitted</div></div>
         <div className="stat-card s3"><div className="stat-val">{avg}</div><div className="stat-lbl">Average Score</div></div>
-        <div className="stat-card s2"><div className="stat-val">{strong}</div><div className="stat-lbl">Strong (17+)</div></div>
+        <div className="stat-card s2"><div className="stat-val">{strong}</div><div className="stat-lbl">Strong ({strongCut}+)</div></div>
         <div className="stat-card s4"><div className="stat-val">{inProgress}</div><div className="stat-lbl">In Progress</div></div>
       </div>
 
@@ -277,7 +282,7 @@ export default function AssessmentResults() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 860 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #e8e2d9", background: "#faf8f5" }}>
-                {["Candidate", "Score", "A / 5", "B / 5", "C / 6", "D / 4", "Band", "Submitted", "Took", ""].map((h, i) => (
+                {["Candidate", "Score", ...SECTION_META.map((s) => `${s.id} / ${s.count}`), "Band", "Submitted", "Took", ""].map((h, i) => (
                   <th key={i} style={{ padding: "12px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#8a7e72", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -298,7 +303,7 @@ export default function AssessmentResults() {
                   <td style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>
                     {r.status === "submitted" ? (
                       <span style={{ fontFamily: "'Fraunces',serif", fontSize: 17, fontWeight: 700 }}>
-                        {r.score_total}<span style={{ fontSize: 12, color: "#8a7e72" }}> / {TOTAL_MARKS}</span>
+                        {r.score_total}<span style={{ fontSize: 12, color: "#8a7e72" }}> / {marksFor(r.assessment_id)}</span>
                       </span>
                     ) : (
                       <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: "rgba(245,158,11,0.12)", color: "#b45309" }}>

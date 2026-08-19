@@ -160,7 +160,8 @@ candidates to bring a printed CV to the venue.
 2. VERIFY       → Check photo ID; confirm they appear in the response Sheet
                   (walk-ins without prior registration are allowed — register on the spot)
 3. ASSESSMENT   → Send them to /test.html on their phone. They enter their email
-                  and name, and sit the 20-question paper (§5.4). 25 min. Invigilated.
+                  and name, and sit the 25-question paper (§5.4). 35 min. Invigilated.
+                  COLLECT PHONES — the paper is not AI-proof (§5.4).
                   If the Wi-Fi is down, issue the printed 13-question paper (§5.0).
 4. MARK         → Online: marked automatically, score on screen at submit, and in
                   the Assessment panel. Paper: evaluator marks against the key.
@@ -175,20 +176,26 @@ candidates to bring a printed CV to the venue.
 
 ## 5. THE ASSESSMENT — QUESTION BANK
 
-> **Two versions are live. Read this before using either.**
+> **Read this before using any version.**
 >
-> | | `HAG-WALKIN-L1-v1` | `HAG-WALKIN-L1-v2` |
+> | | `HAG-WALKIN-L1-v1` | `HAG-WALKIN-L1-v3` |
 > |---|---|---|
-> | Format | 13 questions · 15 min | **20 questions · 25 min** |
-> | Sections | A 5 · B 3 · C 5 | A 5 · B 5 · C 6 · **D 4 (cases)** |
+> | Format | 13 questions · 15 min | **25 questions · 35 min** |
+> | Tests | Arithmetic, reasoning, site vocabulary | **Situational judgement, procedure, client handling** |
+> | Sections | A 5 · B 3 · C 5 | A 5 · B 6 · C 6 · D 4 · E 4 |
 > | Delivery | Printed paper, hand-marked | **Online, auto-marked** |
-> | Where | §5.1 below | §5.4 below |
+> | Where | §5.0 below | §5.4 below |
 > | Use it for | Wi-Fi failure fallback | **The 22 Aug drive** |
 >
-> **v2 is the paper the drive runs on.** v1 is retained verbatim as the offline
-> fallback required by §7.2 — if the venue Wi-Fi dies, HR issues the printed
-> sheet and the day continues. Scores across the two are not directly
-> comparable; record which version a candidate sat.
+> **v3 is the paper the drive runs on.** v1 is retained verbatim as the offline
+> fallback required by §7.3 — if the venue Wi-Fi dies, HR issues the printed
+> sheet and the day continues. Scores across versions are not comparable;
+> `assessment_id` on the attempt records which paper a candidate sat.
+>
+> **`HAG-WALKIN-L1-v2`** (20 questions) was the first online paper and is
+> superseded. It was replaced before the drive because it mostly tested whether
+> a candidate had read a glossary, not whether they could run a site. Its
+> attempts remain readable and re-markable; do not reuse the id.
 
 ### 5.0 v1 — the printed fallback paper
 
@@ -338,38 +345,56 @@ deliberately easy and contains **no role-specific technical content**.
 |---|---|---|---|---|---|---|---|---|---|----|----|----|----|
 | **Ans** | C | C | B | B | C | C | C | B | B | C | A | B | C |
 
-### 5.4 v2 — the live online paper (`HAG-WALKIN-L1-v2`)
+### 5.4 v3 — the live online paper (`HAG-WALKIN-L1-v3`)
 
-**Format:** 20 MCQs · 1 mark each · 20 marks · 25 minutes · no negative marking
-**Sections:** A — Numerical Aptitude (5) · B — Logical Reasoning (5) ·
-C — General Industry Awareness (6) · **D — Situational Judgement (4, case-based)**
+**Format:** 25 MCQs · 1 mark each · 25 marks · 35 minutes · no negative marking
 
-All 13 v1 questions carry over **verbatim** (renumbered: A stays 1–5, B 6–8,
-C moves to 11–15). Seven are new:
+| Section | Name | Q | Marks |
+|---|---|---|---|
+| A | Site Execution & Sequencing | 1–5 | 5 |
+| B | Client & Stakeholder Handling | 6–11 | 6 |
+| C | Procedure & Documentation | 12–17 | 6 |
+| D | Commercial Judgement | 18–21 | 4 |
+| E | Safety & Problem Diagnosis | 22–25 | 4 |
 
-| New Q | Section | Tests |
-|-------|---------|-------|
-| 9 | B | Work rate — 5 workers/6 days → 3 workers/? |
-| 10 | B | Conditional logic — the answer is *cannot be determined* |
-| 16 | C | What "snagging" means at handover |
-| 17 | D | Labourer at height, no PPE, supervisor absent |
-| 18 | D | Client spots wrong flooring shade, 4-day material vs 3-day handover |
-| 19 | D | Faster vendor at ₹4.5L vs approved vendor at ₹3.95L, project on schedule |
-| 20 | D | Plastering team arrives before electrical conduits are laid |
+**Every question is a situation.** The candidate is put in a real position and
+asked what they would **do**, what procedure they would follow, or how they
+would handle a client. The distractors are the mistakes people actually make on
+site — the shortcut, the people-pleasing answer, the rigid rule-follower answer,
+the "not my worker" answer — so a candidate cannot reach the right option by
+elimination without having lived it.
 
-Section B grew from 3 to 5 exactly as §7.4 asked — 3 questions was a signal a
-candidate could pass or fail on luck.
+The four Section D questions are numerical, but the arithmetic sits inside a
+commercial situation (a BOQ variation, an LD calculation, a landed-cost
+comparison, a material reconciliation) rather than being asked bare. They test
+whether someone can reason about money on a project, not whether they can
+multiply.
 
-**Section D carries no role-specific technical content**, per §7.4. Every one of
-the 13 positions sits the same paper; the cases test safety instinct, client
-handling, cost judgement and work sequencing in the general site/office
-register.
+**Why v2 was replaced.** v1 and v2 tested arithmetic, general reasoning and site
+vocabulary. "What does BOQ stand for" separates people who have read a glossary
+from people who have not — it does not separate people who can run a site from
+people who cannot. v3 was rebuilt around the failure modes these projects
+actually have: undocumented verbal variations, late bad news to the client,
+uncontrolled drawing revisions, unverified GRNs, buried near misses, and
+repeat-repairing a symptom instead of finding the cause.
+
+**Still no role-specific technical content** (§7.5). All 13 positions sit the
+same paper. The situations are drawn from interior fit-out, façade, civil and
+PEB work because that is the business, but every correct answer turns on
+judgement, procedure or commercial sense rather than trade knowledge.
+
+**⚠️ It is not AI-proof, and cannot be made so.** A large language model answers
+situational-judgement questions very well — better than most candidates.
+Question design only makes the paper hard to answer *without real experience*,
+which is what makes it discriminate between humans. **Invigilation — phones
+collected at the desk — is the control for AI.** Do not rely on the questions
+for that.
 
 **Canonical source of the questions and the key:**
 `supabase/functions/_shared/assessment-bank.ts`.
 That file is **server-only** — it is imported by the `assessment` edge function
 and never bundled into anything a browser downloads. Do not copy the answers
-into any client-side file. To produce the printed v2 sheet, read the questions
+into any client-side file. To produce a printed v3 sheet, read the questions
 from that module and omit `answer` / `explanation`.
 
 **Where candidates sit it:** `https://hr-hiring-automation.vercel.app/test.html`
@@ -391,14 +416,14 @@ Footer: candidate declaration + signature, date, invigilator signature.
 
 ### 6.1 Bands
 
-**v2 — 20 marks (the live online paper):**
+**v3 — 25 marks (the live online paper):**
 
 | Score | % | Band | Action |
 |-------|---|------|--------|
-| 17–20 | 85%+ | STRONG | Shortlist — send to technical panel first |
-| 12–16 | 60%+ | AVERAGE | Proceed to interview normally |
-| 8–11 | 40%+ | WEAK | Judge by role and experience |
-| 0–7 | <40% | BELOW_BAR | Interview only if experience is strong |
+| 21–25 | 85%+ | STRONG | Shortlist — send to technical panel first |
+| 15–20 | 60%+ | AVERAGE | Proceed to interview normally |
+| 10–14 | 40%+ | WEAK | Judge by role and experience |
+| 0–9 | <40% | BELOW_BAR | Interview only if experience is strong |
 
 **v1 — 13 marks (the printed fallback):**
 
@@ -409,24 +434,34 @@ Footer: candidate declaration + signature, date, invigilator signature.
 | 5–7 | Weak | Judge by role and experience |
 | 0–4 | Below bar | Interview only if experience is strong |
 
-The v2 cuts are the v1 cuts rescaled to the same percentages, so a STRONG on
-either paper means roughly the same thing.
+The v3 cuts are the v1 cuts rescaled to the same percentages, so a STRONG on
+any version means roughly the same thing. `assessment_id` on the attempt records
+which paper was sat.
 
 ### 6.2 Section-level reading
 
-Worth recording section scores separately, not just the total. v2 stores all
-four; the Assessment panel shows them per candidate.
+Worth recording section scores separately, not just the total. v3 stores all
+five; the Assessment panel shows them per candidate. What each pattern means:
 
-- **Section A low, C high** → practical experience, weak on arithmetic.
-  Fine for Site Supervisor; a concern for Procurement or Documentation Controller.
-- **Section C low, A high** → numerate but new to the industry.
-  Fine for a fresher Sales Executive; a concern for Site Engineer.
-- **Section B** — in v1 this is only 3 questions and is a weak signal a candidate
-  can pass or fail on luck. v2 expands it to 5, which carries real weight.
-- **Section D (v2 only, 4 case questions)** is the closest thing on this paper to
-  a judgement signal. A candidate strong on A/B/C but weak on D is numerate and
-  knows the vocabulary but reasons poorly under a real situation — worth a
-  targeted question at interview rather than a rejection.
+- **B low (Client & Stakeholder Handling)** → will need supervision in front of a
+  client. Fine for a Site Supervisor or Factory Operations; a real concern for a
+  Project Manager, Sales Manager or Architect who fronts the client themselves.
+- **C low (Procedure & Documentation)** → gets work done but leaves no paper
+  trail. This is the profile that loses variation claims and fails audits.
+  Disqualifying-ish for a Documentation Controller or Procurement; coachable in a
+  Site Engineer.
+- **D low (Commercial Judgement)** → cannot reason about money on a project.
+  A concern for Procurement, Sales and Project Manager; largely irrelevant for a
+  Site Supervisor.
+- **E low (Safety & Problem Diagnosis)** → probe this at interview regardless of
+  role. Q22 (stopping another agency's unsafe act) and Q14 (near-miss reporting)
+  are the two worth asking about directly.
+- **A high, everything else low** → practical and quick on site, weak on process
+  and people. Common in experienced supervisors and often perfectly hireable.
+
+A candidate strong on A/D but weak on B/C is a doer who will cost you at
+closeout. A candidate strong on B/C but weak on A has never actually run a floor.
+Neither is a reject — both are a specific question to ask the panel to probe.
 
 ### 6.3 ⚠️ How this score must NOT be used
 
@@ -506,14 +541,14 @@ knowing:
 |-------------|--------------|
 | Question order | Fixed — sections are meaningful and the paper version must match. |
 | Option order | Shuffled within each question. The presented order is stored on the attempt. |
-| Timer | 25 minutes, visible, counted against the **server's** `ends_at` (client clocks on borrowed phones are not trustworthy). Auto-submits on expiry. |
-| Navigation | Back/forward, plus a 20-cell palette showing what is answered. No penalty for changing an answer. |
+| Timer | 35 minutes, visible, counted against the **server's** `ends_at` (client clocks on borrowed phones are not trustworthy). Auto-submits on expiry. |
+| Navigation | Back/forward, plus a 25-cell palette showing what is answered. No penalty for changing an answer. |
 | Partial submit | Whatever is answered is scored; unanswered = 0. No negative marking. Past the timer the paper is still marked and flagged `auto_submitted` — a candidate never loses their work to a slow phone. |
-| Resume | An attempt in progress resumes on the **same** token, paper and remaining time. A refresh, a dead battery or a dropped connection does not cost a fresh attempt or a fresh 25 minutes. Answers mirror to `localStorage` on every tap. |
+| Resume | An attempt in progress resumes on the **same** token, paper and remaining time. A refresh, a dead battery or a dropped connection does not cost a fresh attempt or a fresh 35 minutes. Answers mirror to `localStorage` on every tap. |
 | Retake | **One attempt per candidate per drive.** Re-opening with a used email shows the earlier score and directs them to the HR desk. HR clicks **Allow retake** in the Assessment panel to grant exactly one re-sit; the unlock is consumed by the next start, so it cannot become unlimited re-sits. |
 | Device | Built for a low-end Android: one question per screen, 44px+ tap targets, 16px inputs, no hover-only cues. |
 | Offline fallback | The printed v1 paper (§5.0, §5.5) stays in use. If the venue Wi-Fi fails, HR switches to paper without losing the day. |
-| What the candidate sees | Total score out of 20 and the four section scores. **Not** the band, and **not** the correct answers — the band is an internal routing signal (§6.3), and printing the key on screen would leak the paper across the hall within an hour. |
+| What the candidate sees | Total score out of 25 and the five section scores. **Not** the band, and **not** the correct answers — the band is an internal routing signal (§6.3), and printing the key on screen would leak the paper across the hall within an hour. |
 
 ### 7.4 Versioning
 
@@ -525,9 +560,15 @@ re-markable against the exact question set the candidate saw. `presented` and
 
 ### 7.5 Future question bank expansion
 
-Section B was expanded from 3 to 5 in v2, as this section previously called for.
-Keep total time proportional (roughly 1 minute per question plus 2 minutes
-reading; Section D stems are longer, hence 25 minutes for 20 questions).
+v3 replaced the aptitude-and-vocabulary paper entirely with a situational one.
+Keep total time proportional — every v3 question carries a situation to read,
+which is why 25 questions need 35 minutes rather than the ~1 minute per question
+the earlier versions ran at. **Check throughput on the day:** 35 minutes per
+candidate is a real constraint on a walk-in queue. If the hall backs up, run more
+devices in parallel rather than cutting the time.
+
+If a Section D answer turns out not to match how Hagerstone actually works, that
+is a content fix, not a bug — change it in `assessment-bank.ts` and mint v4.
 
 Do **not** add role-specific technical questions to this paper — all 13 positions
 sit it. If department-level technical screening is wanted, build it as a
@@ -554,7 +595,7 @@ the same call shape as `screen-resume`.
 | Asset | File / Location | Notes |
 |-------|-----------------|-------|
 | Carousel posters (14) | `Drive_22Aug_Card01..14_*.png` | 2160×2160, 1:1 |
-| Online assessment | `/test.html` on the hiring app | v2 · 20 Q · live · see §7 |
+| Online assessment | `/test.html` on the hiring app | v3 · 25 Q · live · see §7 |
 | Question bank + key | `supabase/functions/_shared/assessment-bank.ts` | **Server-only. Never publish.** |
 | Assessment paper (v1) | `Hagerstone_Walkin_Assessment_13Q.pdf` | 3 pages · Wi-Fi-failure fallback |
 | Indeed listing | `Hagerstone_Indeed_Job_Posting.docx` | Ready to paste |
@@ -598,12 +639,19 @@ Two pieces of content were drafted from general industry knowledge, **not** from
 Hagerstone job descriptions:
 
 1. **The 52 responsibility bullet points** on the 13 role posters (4 per role).
-2. **The assessment questions** in §5 — both the original 13 and, now, the **7 new
-   v2 questions** (§5.4). The four Section D case questions are the ones most
-   worth a second pair of eyes: a "best answer" on client handling or on
-   overriding a supervisor is a claim about how Hagerstone expects its people to
-   behave, and a candidate can hold you to it at interview. Review these before
-   22 August.
+2. **The assessment questions** in §5. This matters far more for v3 than it did
+   for v1: almost every v3 answer is a claim about *how Hagerstone expects its
+   people to behave*, not a fact. "What does BOQ stand for" cannot be wrong for
+   Hagerstone specifically. "Confirm the client's verbal change in writing before
+   starting", "escalate before suspending work for non-payment", and "hold the
+   column and refer a 12 mm bolt deviation to the designer" all can be — and a
+   candidate can hold you to any of them at interview.
+
+   **Highest priority to review, in order:** Q6 and Q10 (client change requests
+   and non-payment — both describe your commercial process), Q12 (whose
+   instruction your team may act on), Q2 (structural escalation threshold),
+   Q13 (GRN and rejection practice). Fifteen minutes with someone who runs sites
+   and someone who runs procurement covers all five.
 
 Neither has been reviewed by HR or department heads. Two specific items to verify:
 - Civil Engineer poster states *"Ensure quality as per IS standards"* — confirm

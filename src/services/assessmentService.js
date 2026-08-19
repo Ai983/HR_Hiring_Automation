@@ -8,8 +8,17 @@
 
 import { supabase } from "../supabaseClient.js";
 
-export const ASSESSMENT_ID = "HAG-WALKIN-L1-v2";
-export const TOTAL_MARKS = 20;
+// Kept in step with supabase/functions/_shared/assessment-bank.ts. TOTAL_MARKS
+// is only used for the "n / 25" labels; the stored scores are authoritative and
+// a v2 attempt (20 marks) still renders correctly from its own `review`.
+export const ASSESSMENT_ID = "HAG-WALKIN-L1-v3";
+export const TOTAL_MARKS = 25;
+
+// Attempts are never migrated between versions (§7.3), so the panel will show
+// v2 and v3 rows side by side for a while. Score out of the paper the candidate
+// actually sat, not out of whatever the current paper happens to be.
+const PAPER_MARKS = { "HAG-WALKIN-L1-v2": 20, "HAG-WALKIN-L1-v3": 25 };
+export const marksFor = (assessmentId) => PAPER_MARKS[assessmentId] ?? TOTAL_MARKS;
 
 export const BANDS = {
   STRONG:    { label: "Strong",    bg: "rgba(34,197,94,0.12)",  color: "#16a34a" },
@@ -31,7 +40,7 @@ export async function fetchAttempts({ dateFrom, dateTo, band, search, sort = "sc
   if (!supabase) return [];
   let q = supabase
     .from("assessment_attempts")
-    .select("id, assessment_id, email, full_name, attempt_no, applicant_id, started_at, submitted_at, duration_seconds, auto_submitted, score_total, score_section_a, score_section_b, score_section_c, score_section_d, band, status, retake_unlocked, unlocked_by, notes")
+    .select("id, assessment_id, email, full_name, attempt_no, applicant_id, started_at, submitted_at, duration_seconds, auto_submitted, score_total, score_section_a, score_section_b, score_section_c, score_section_d, score_section_e, band, status, retake_unlocked, unlocked_by, notes")
     .limit(1000);
 
   if (dateFrom) q = q.gte("started_at", new Date(dateFrom + "T00:00:00").toISOString());

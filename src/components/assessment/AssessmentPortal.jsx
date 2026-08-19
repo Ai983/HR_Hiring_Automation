@@ -15,8 +15,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { startAttempt, submitAttempt } from "../../services/assessmentApi.js";
 import "./AssessmentPortal.css";
 
-const SESSION_KEY = "hag_assessment_session_v2";
-const ANSWERS_KEY = "hag_assessment_answers_v2";
+// Bumped with the paper version so a half-finished v2 sheet cached on a phone
+// can never be restored on top of the v3 paper.
+const SESSION_KEY = "hag_assessment_session_v3";
+const ANSWERS_KEY = "hag_assessment_answers_v3";
+
+// Shown on the start screen, before the server has told us anything. Keep in
+// step with TOTAL_QUESTIONS / DURATION_MINUTES in assessment-bank.ts — the
+// timer and the marking follow the server, this is only the briefing.
+const BRIEF_QUESTIONS = 25;
+const BRIEF_MINUTES = 35;
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 const readJson = (key) => {
@@ -260,8 +268,9 @@ export default function AssessmentPortal() {
           <div className="as-card-title">First-Level Assessment</div>
 
           <ul className="as-rules">
-            <li><b>20 questions</b> · 1 mark each</li>
-            <li><b>25 minutes.</b> The test submits automatically when time is up.</li>
+            <li><b>{BRIEF_QUESTIONS} questions</b> · 1 mark each</li>
+            <li><b>{BRIEF_MINUTES} minutes.</b> The test submits automatically when time is up.</li>
+            <li>Most questions describe a real work situation. Choose the <b>best</b> action.</li>
             <li>No negative marking — a wrong answer costs nothing, so attempt all.</li>
             <li>You may go back and change any answer before submitting.</li>
             <li>One attempt only. Your email identifies your paper.</li>
@@ -400,7 +409,7 @@ export default function AssessmentPortal() {
       <main className="as-question fade-in" key={current.n}>
         {current.scenario && (
           <div className="as-scenario">
-            <div className="as-scenario-label">Case</div>
+            <div className="as-scenario-label">Situation</div>
             {current.scenario}
           </div>
         )}
