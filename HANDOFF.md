@@ -364,9 +364,11 @@ These `.md`/`.sql` files carry the design context for the whole system and belon
 | `supabase/migrations/` | **The runnable DDL**, exported from what was actually applied. `README.md` there gives the order and lists what a clone still won't have. |
 | `DEPLOY-NOTES.md` | ⚠️ Deploy steps written for the **old** standalone project `sgerslbmnwrltqrhsdir` ("Hiring System"), **not** the current hub `tpfvnerrjhqwipyonngf`. Treat as historical. |
 | `RUN-IN-SQL-EDITOR.sql` | ⚠️ One-off location schema for the **old** project `sgerslbmnwrltqrhsdir`. Superseded by `supabase/hub-migration/*.sql`. Historical. |
+| `CLAUDE.md` | **Start here.** Short orientation for anyone picking the repo up — stack, the three Vite entry points, the hard rules, and the full engineering notes for the walk-in assessment system (built 19 Aug 2026). |
+| `HAGERSTONE_DRIVE_AND_ASSESSMENT.md` | The 22 Aug 2026 mass interview drive: roles, funnel, the assessment paper and its scoring policy, and the open items still needing HR sign-off. |
 | `HANDOFF.md` | This document. |
 
-**Reading order for a new dev:** `hagerstone-hiring-automation-blueprint.md` → `HANDOFF.md` (this) →
+**Reading order for a new dev:** `CLAUDE.md` → `hagerstone-hiring-automation-blueprint.md` → `HANDOFF.md` (this) →
 `supabase/rls-hardening-golive.sql` (how access works now) →
 `supabase/hr-attendance-hsipl-parity.sql` (how attendance works now) →
 `LOCATION-TRACKING-SYSTEM.md` → `LOCATION-TRACKING-HIREFLOW-PLAN.md` → `HRMS.md` (the road ahead).
