@@ -20,6 +20,13 @@ they are shared with live apps.
 | 6 | `20260730072038_hr_rollup_views_security_invoker.sql` | **security fix** — the three views were owner-rights and bypassed RLS entirely |
 | 7 | `20260730084436_hr_leave_days_two_decimals_for_short_leave.sql` | **data fix** — day columns were `numeric(4,1)`, silently rounding 0.25-day short leaves to 0.3 |
 | 8 | `20260730090000_hr_attendance_seed_reference_data.sql` | the 45 sites and 10 holidays (applied as plain SQL originally, captured here for reproducibility) |
+| 9 | `20260814074535_attendance_coverage_gap_blackout.sql` | **data fix** — adds `coverage_gap_from/to` and rebuilds `attendance_day` to drop punch-less, leave-less days inside the import→go-live gap, which were being scored `absent` |
+| 10 | `20260818093922_hr_leave_approval_ea_only.sql` | `is_leave_approver()` — only EA may write a leave decision; every HR/admin role keeps read access |
+| 11 | `20260819062423_hr_rls_helper_calls_as_initplan.sql` | **performance fix** — policy helper calls were bare, so Postgres re-ran them per row and "My Attendance" hit the 8s `statement_timeout`. Wraps them in `(select …)`; 2390ms → 5ms. Access model unchanged |
+
+`9` is the current definition of `hr.attendance_day` and supersedes `4` and `5`.
+It was applied to production on 2026-08-14 but only captured into this repo on
+2026-08-19, so anything built from files 1-8 alone will be behind production.
 
 Then apply the access model, which is a separate concern and predates these:
 
@@ -27,6 +34,9 @@ Then apply the access model, which is a separate concern and predates these:
 ../rls-location.sql            # the 4 attendance/location tables (applied earlier)
 ../rls-hardening-golive.sql    # the full hr access model — 27 statements, runnable
 ```
+
+`10` re-creates most of what `rls-hardening-golive.sql` defines, so it must be applied
+**after** that file, not before. Applying the hardening script again would undo it.
 
 ## Not in this repo
 
