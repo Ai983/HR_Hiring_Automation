@@ -23,6 +23,7 @@ they are shared with live apps.
 | 9 | `20260814074535_attendance_coverage_gap_blackout.sql` | **data fix** — adds `coverage_gap_from/to` and rebuilds `attendance_day` to drop punch-less, leave-less days inside the import→go-live gap, which were being scored `absent` |
 | 10 | `20260818093922_hr_leave_approval_ea_only.sql` | `is_leave_approver()` — only EA may write a leave decision; every HR/admin role keeps read access |
 | 11 | `20260819062423_hr_rls_helper_calls_as_initplan.sql` | **performance fix** — policy helper calls were bare, so Postgres re-ran them per row and "My Attendance" hit the 8s `statement_timeout`. Wraps them in `(select …)`; 2390ms → 5ms. Access model unchanged |
+| 12 | `20260819120000_hr_walkin_assessment_attempts.sql` | `assessment_attempts` — the walk-in test (§7 of `HAGERSTONE_DRIVE_AND_ASSESSMENT.md`). Applied 2026-08-19. **No `anon` policy and no `anon` grant** — candidates are anonymous and reach the table only through the service-role `assessment` edge function |
 
 `9` is the current definition of `hr.attendance_day` and supersedes `4` and `5`.
 It was applied to production on 2026-08-14 but only captured into this repo on

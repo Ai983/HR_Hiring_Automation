@@ -4,20 +4,23 @@ import { PORTALS } from "../../constants.js";
 import { supabase } from "../../supabaseClient.js";
 import { fetchSurveyNewCount } from "../../services/surveyService.js";
 import { fetchPendingLeaveCount } from "../../services/leaveService.js";
+import { fetchTodaySubmittedCount } from "../../services/assessmentService.js";
 import SyncStatus from "./SyncStatus.jsx";
 
 export default function Sidebar() {
   const { panel, setPanel, jobs, applicants, setSelectedJob, ctx, hasModule, logout } = useApp();
   const [surveyCount, setSurveyCount] = useState(0);
   const [leaveCount, setLeaveCount]   = useState(0);
+  const [assessCount, setAssessCount] = useState(0);
 
   useEffect(() => {
-    fetchSurveyNewCount().then(setSurveyCount);
-    fetchPendingLeaveCount().then(setLeaveCount);
-    const interval = setInterval(() => {
+    const refresh = () => {
       fetchSurveyNewCount().then(setSurveyCount);
       fetchPendingLeaveCount().then(setLeaveCount);
-    }, 60000);
+      fetchTodaySubmittedCount().then(setAssessCount).catch(() => {});
+    };
+    refresh();
+    const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -42,6 +45,7 @@ export default function Sidebar() {
         { id: "jobs",          icon: "≡", label: "All Jobs",        badge: liveJobs },
         { id: "applicants",    icon: "◎", label: "Applicants",      badge: newApps },
         { id: "survey",        icon: "📋", label: "Survey Leads",    badge: surveyCount },
+        { id: "assessment",    icon: "\u{1F9EE}", label: "Assessment",     badge: assessCount },
         { id: "calling",       icon: "☎", label: "Calling Queue",   badge: callingQ },
         { id: "interviews",    icon: "\u{1F4C5}", label: "Interviews",    badge: interviews },
         { id: "reference",     icon: "✅", label: "Reference Check", badge: references },

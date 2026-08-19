@@ -1,0 +1,226 @@
+/* ── Walk-in assessment portal ────────────────────────────────────────
+   Scoped with an `as-` prefix, mirroring AttendancePortal.css (`ap-`).
+   Sized for a low-end Android held one-handed: 44px+ tap targets, 16px
+   inputs (anything smaller makes iOS zoom on focus), no hover-only cues. */
+
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  background:#f7f4ef;
+  font-family:'Nunito',sans-serif;
+  color:#1a1612;
+  min-height:100vh;
+  -webkit-text-size-adjust:100%;
+  /* Chrome Android's pull-to-refresh would reload the page mid-test. The
+     answers survive in localStorage, but the candidate sees a blank flash and
+     panics. Stop the gesture from reaching the browser. */
+  overscroll-behavior-y:contain;
+}
+
+#assessment-root{width:100%;max-width:560px;margin:0 auto;}
+
+/* Kill the 300ms tap delay and the grey flash on every control. On a budget
+   Android that delay reads as "the button didn't work" and gets double-tapped. */
+button,.as-option,.as-cell{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.25s ease both;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.as-spinner{
+  display:inline-block;width:16px;height:16px;
+  border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;
+  border-radius:50%;animation:spin 0.65s linear infinite;vertical-align:middle;
+}
+
+/* ── Layout ──────────────────────────────────────────────────────── */
+.as-shell{width:100%;min-height:100vh;min-height:100dvh;}
+.as-center{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:24px;padding:32px 18px;
+}
+
+.as-brand{display:flex;align-items:center;gap:14px;}
+.as-logo{
+  width:50px;height:50px;border-radius:14px;flex-shrink:0;
+  background:linear-gradient(135deg,#e8a24a,#c97a2a);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif;font-weight:700;font-size:24px;color:#1a1612;
+}
+.as-company{font-family:'Fraunces',serif;font-size:20px;font-weight:700;}
+.as-tagline{font-size:12px;color:#8a7e72;margin-top:2px;}
+
+.as-card{
+  width:100%;max-width:420px;
+  background:#fff;border:1px solid #e8e2d9;border-radius:18px;
+  padding:26px 22px;display:flex;flex-direction:column;gap:16px;
+}
+.as-card-narrow{text-align:center;align-items:center;}
+.as-card-title{font-family:'Fraunces',serif;font-size:20px;font-weight:700;line-height:1.3;}
+
+.as-icon{
+  width:52px;height:52px;border-radius:50%;
+  background:#e9f3ea;color:#3f7d4c;
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+}
+
+.as-body{font-size:14px;color:#5a5048;line-height:1.55;}
+.as-body-strong{font-size:15px;font-weight:700;color:#1a1612;margin-top:4px;}
+.as-note{font-size:12px;color:#8a7e72;line-height:1.5;}
+.as-note-warn{
+  background:#fdf3e3;border:1px solid #f0dcb8;border-radius:10px;
+  padding:8px 10px;color:#8a6a2a;
+}
+
+.as-rules{
+  list-style:none;display:flex;flex-direction:column;gap:7px;
+  background:#faf8f5;border:1px solid #eee7dd;border-radius:12px;padding:14px 16px;
+  font-size:13px;color:#5a5048;line-height:1.45;
+}
+.as-rules li{position:relative;padding-left:14px;}
+.as-rules li::before{content:"·";position:absolute;left:2px;font-weight:700;color:#c97a2a;}
+
+.as-field{display:flex;flex-direction:column;gap:6px;}
+.as-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#5a5048;}
+.as-input{
+  background:#faf8f5;border:1.5px solid #e0d9cf;border-radius:10px;
+  padding:13px 14px;font-family:'Nunito',sans-serif;font-size:16px;color:#1a1612;
+  width:100%;
+}
+.as-input:focus{outline:none;border-color:#c97a2a;background:#fff;}
+
+.as-error{
+  background:#fdecec;border:1px solid #f3c9c9;border-radius:10px;
+  padding:10px 12px;font-size:13px;color:#a3352f;line-height:1.45;
+}
+.as-error-fixed{
+  position:fixed;left:12px;right:12px;bottom:80px;z-index:30;
+  max-width:536px;margin:0 auto;
+  display:flex;flex-direction:column;gap:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.as-btn{
+  border:none;border-radius:12px;cursor:pointer;
+  font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;
+  padding:13px 18px;min-height:46px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.as-btn:disabled{opacity:0.45;cursor:default;}
+.as-btn-primary{background:#1a1612;color:#fff;}
+.as-btn-ghost{background:#f2ede6;color:#5a5048;}
+.as-btn-review{font-variant-numeric:tabular-nums;min-width:78px;}
+
+/* ── Test — top bar ──────────────────────────────────────────────── */
+.as-test{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;}
+
+.as-topbar{
+  position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 16px;background:#fff;border-bottom:1px solid #e8e2d9;
+  padding-top:calc(12px + env(safe-area-inset-top));
+}
+.as-topbar-left{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.as-qcount{font-family:'Fraunces',serif;font-size:15px;font-weight:700;}
+.as-dim{color:#b0a898;font-weight:400;}
+.as-section-tag{
+  font-size:11px;color:#8a7e72;text-transform:uppercase;letter-spacing:0.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.as-timer{
+  font-family:'Fraunces',serif;font-size:20px;font-weight:700;
+  font-variant-numeric:tabular-nums;
+  background:#f2ede6;border-radius:10px;padding:6px 12px;
+}
+.as-topbar-low .as-timer{background:#fdecec;color:#a3352f;}
+
+/* ── Test — question ─────────────────────────────────────────────── */
+.as-question{flex:1;padding:20px 16px 100px;}
+
+.as-scenario{
+  background:#fff;border:1px solid #e8e2d9;border-left:3px solid #c97a2a;
+  border-radius:12px;padding:14px 16px;margin-bottom:16px;
+  font-size:14px;color:#5a5048;line-height:1.6;
+}
+.as-scenario-label{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  color:#c97a2a;margin-bottom:6px;
+}
+
+.as-qtext{
+  font-family:'Fraunces',serif;font-size:19px;font-weight:600;line-height:1.4;
+  margin-bottom:18px;
+}
+
+.as-options{display:flex;flex-direction:column;gap:10px;}
+.as-option{
+  display:flex;align-items:flex-start;gap:12px;text-align:left;width:100%;
+  background:#fff;border:1.5px solid #e8e2d9;border-radius:14px;
+  padding:14px;cursor:pointer;
+  font-family:'Nunito',sans-serif;font-size:15px;color:#1a1612;line-height:1.45;
+}
+.as-option-on{border-color:#1a1612;background:#fdfaf5;}
+.as-option-letter{
+  flex-shrink:0;width:26px;height:26px;border-radius:50%;
+  background:#f2ede6;color:#5a5048;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;margin-top:1px;
+}
+.as-option-on .as-option-letter{background:#1a1612;color:#fff;}
+/* min-width:0 + break-word — without these a long unbroken option (a URL, a
+   run-on arrow sequence) pushes the card wider than the phone and the whole
+   page scrolls sideways. */
+.as-option-text{flex:1;min-width:0;overflow-wrap:break-word;word-break:break-word;}
+
+/* ── Test — bottom nav ───────────────────────────────────────────── */
+.as-navbar{
+  position:fixed;bottom:0;left:0;right:0;z-index:20;
+  max-width:560px;margin:0 auto;
+  display:flex;gap:8px;padding:10px 12px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  background:#fff;border-top:1px solid #e8e2d9;
+}
+.as-navbar .as-btn{flex:1;}
+
+/* ── Review palette ──────────────────────────────────────────────── */
+.as-palette-sheet{
+  position:fixed;inset:0;z-index:40;
+  background:rgba(26,22,18,0.45);
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.as-palette{
+  width:100%;max-width:560px;
+  background:#fff;border-radius:20px 20px 0 0;
+  padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:14px;
+  /* A short landscape phone must still be able to reach Submit. */
+  max-height:88dvh;overflow-y:auto;
+}
+.as-palette-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;text-align:center;}
+.as-palette-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.as-cell{
+  aspect-ratio:1;border-radius:10px;cursor:pointer;
+  background:#f2ede6;border:1.5px solid transparent;color:#8a7e72;
+  font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;
+}
+.as-cell-on{background:#e9f3ea;color:#3f7d4c;}
+.as-cell-now{border-color:#1a1612;}
+
+/* ── Result ──────────────────────────────────────────────────────── */
+.as-score{display:flex;flex-direction:column;align-items:center;gap:2px;margin:4px 0;}
+.as-score-value{font-family:'Fraunces',serif;font-size:56px;font-weight:700;line-height:1;}
+.as-score-of{font-size:13px;color:#8a7e72;}
+
+.as-sections{width:100%;display:flex;flex-direction:column;gap:12px;margin-top:6px;}
+.as-section-row{display:flex;flex-direction:column;gap:5px;text-align:left;}
+.as-section-head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  font-size:13px;color:#5a5048;
+}
+.as-bar{height:7px;border-radius:4px;background:#f2ede6;overflow:hidden;}
+.as-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#e8a24a,#c97a2a);}

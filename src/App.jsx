@@ -26,11 +26,12 @@ import OfferLetters from "./components/panels/OfferLetters.jsx";
 import Onboarding from "./components/panels/Onboarding.jsx";
 import Documents from "./components/panels/Documents.jsx";
 import SurveyLeads from "./components/panels/SurveyLeads.jsx";
+import AssessmentResults from "./components/panels/AssessmentResults.jsx";
 import ApplicantModal from "./components/modals/ApplicantModal.jsx";
 import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 
 // Which module each panel belongs to.
-const HIRING = new Set(["dashboard", "post", "jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey"]);
+const HIRING = new Set(["dashboard", "post", "jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment"]);
 export const moduleForPanel = (p) => (HIRING.has(p) ? "hireflow" : "attendance");
 
 function Splash({ text }) {
@@ -96,6 +97,7 @@ function AppContent() {
               {panel === "questionnaire"&& <Questionnaire />}
               {panel === "report"       && <ResumeReport />}
               {panel === "survey"        && <SurveyLeads />}
+              {panel === "assessment"   && <AssessmentResults />}
               {panel === "today"        && <TodayAttendance />}
               {panel === "attendance"   && <AttendanceAdmin />}
               {panel === "weekly"       && <WeeklyAttendance />}
