@@ -141,12 +141,22 @@ export default function AttendanceHistory({ subjectId, showName = false, onSelec
                    cursor: isCurrentMonth ? "not-allowed" : "pointer", opacity: isCurrentMonth ? 0.35 : 1, fontSize: 15, color: C.ink }}>›</button>
       </div>
 
-      {err && (
-        <div style={{ background: "rgba(239,68,68,0.08)", color: C.red, border: `1px solid rgba(239,68,68,0.2)`,
-                      borderRadius: 10, padding: "10px 12px", fontSize: 13, marginBottom: 12 }}>{err}</div>
-      )}
-
-      {loading ? (
+      {/* A failed load must NOT fall through to the tiles below: zeros across the
+          board plus "No attendance recorded" is indistinguishable from a real
+          month of absences, and that is exactly how a statement timeout used to
+          present itself. Show the failure and a way to retry, nothing else. */}
+      {err && !loading ? (
+        <div style={{ background: "rgba(239,68,68,0.06)", border: `1px solid rgba(239,68,68,0.2)`,
+                      borderRadius: 12, padding: "22px 16px", textAlign: "center" }}>
+          <div style={{ color: C.red, fontSize: 13, fontWeight: 600 }}>Could not load this month.</div>
+          <div style={{ color: C.mute, fontSize: 12, marginTop: 6 }}>{err}</div>
+          <button onClick={load}
+            style={{ marginTop: 14, border: `1px solid ${C.line}`, background: C.card, borderRadius: 8,
+                     padding: "7px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.ink }}>
+            Try again
+          </button>
+        </div>
+      ) : loading ? (
         <div style={{ padding: 32, textAlign: "center", color: C.mute, fontSize: 13 }}>Loading…</div>
       ) : (
         <>

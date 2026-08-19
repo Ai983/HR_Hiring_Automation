@@ -31,6 +31,14 @@
 --                                else, cannot self-approve, cannot read PINs
 --  60/60 assertions passed. Kept here as the source of record + rollback.
 --
+--  ⚠ SUPERSEDED IN PART by
+--    migrations/20260819104500_hr_rls_helper_calls_as_initplan.sql
+--  The policies below call hr.my_employee_id() / hr.is_hr_admin() /
+--  hr.has_hireflow() bare, which Postgres re-evaluates for every candidate row
+--  and which timed out "My Attendance". That migration re-creates them with the
+--  call wrapped in `(select …)`. Same access model, evaluated once per
+--  statement. If you ever re-run THIS file, re-run that one straight after.
+--
 --  HOW TO RUN (if ever needed again)
 --  ---------------------------------
 --  Supabase Dashboard -> SQL Editor -> paste -> Run. Safe to re-run.
