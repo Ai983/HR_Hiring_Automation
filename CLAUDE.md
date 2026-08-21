@@ -93,6 +93,35 @@ of truth — if you deploy by pasting, paste what is in the repo.
 >
 > Also: `deploy_edge_function` **replaces the whole function**, with no dry run
 > and no confirmation. There is no partial deploy — get the payload right first.
+> A half-finished experiment deployed here **takes level 1 down**, on a drive day.
+
+### Deploying `assessment` without a `SUPABASE_ACCESS_TOKEN`
+
+Until the token exists, the function is pasted into the MCP tool, and pasting
+~105 KB containing 171 answer keys is exactly the silent-mis-marking risk the
+whole design guards against. So it is never pasted by hand from the banks —
+it is **generated, proven, pasted, and then proven again against production**:
+
+```bash
+npm run assessment:payload -- <scratch>/payload.ts   # generate one flat file
+npm run assessment:verify-payload -- <scratch>/payload.ts   # must pass BEFORE deploying
+#   → paste <scratch>/payload.ts as the single file `index.ts` via the MCP tool
+npm run assessment:verify-live                        # must pass AFTER deploying
+```
+
+- **`make-deploy-payload.mjs`** flattens both banks and the marking logic into
+  one file, because the MCP tool cannot place a file outside the function
+  directory (so `../_shared/…` never bundles). Data is emitted **one question
+  per line** — an 83 KB single line cannot be transcribed or reviewed safely.
+- **`verify-deploy-payload.mjs`** runs the payload's rewritten marking logic and
+  the repo banks over the same shuffles and asserts they agree question by
+  question. Rewritten marking logic is the thing that fails silently.
+- **`verify-live-assessment.mjs`** drives the real API for level 1 and all 13
+  role papers: every served question, scenario and option byte-compared to the
+  bank, no key leaked, perfect paper full marks, all-wrong paper zero, unknown
+  position refused. It writes `@example.com` rows and deletes them.
+
+The repo remains the source of truth; the pasted file is a build artifact.
 
 ---
 

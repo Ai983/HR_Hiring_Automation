@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "assessment:pdf": "node --experimental-strip-types scripts/make-assessment-pdf.mjs",
-    "assessment:verify-roles": "node scripts/verify-role-bank.mjs"
+    "assessment:verify-roles": "node scripts/verify-role-bank.mjs",
+    "assessment:payload": "node scripts/make-deploy-payload.mjs",
+    "assessment:verify-payload": "node scripts/verify-deploy-payload.mjs",
+    "assessment:verify-live": "node scripts/verify-live-assessment.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
