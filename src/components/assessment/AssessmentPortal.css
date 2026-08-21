@@ -270,7 +270,7 @@ button,.as-option,.as-cell{
 
   .as-navbar{position:static;flex-shrink:0;padding:7px 12px;
              padding-bottom:calc(7px + env(safe-area-inset-bottom));}
-  .as-navbar .as-btn{min-height:40px;padding:8px 14px;}
+  .as-navbar .as-btn{min-height:40px;padding:8px 12px;font-size:14px;white-space:nowrap;}
 
   .as-scenario{padding:10px 12px;margin-bottom:10px;}
   .as-qtext{margin-bottom:10px;}
