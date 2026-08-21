@@ -193,12 +193,12 @@ browser anonymous, which forces everything else:
 - **`localStorage` keys are version-suffixed** (`hag_assessment_session_v5`) so a
   half-finished older sheet cached on a phone cannot restore on top of a new paper.
 - If you change `TOTAL_QUESTIONS` or `DURATION_MINUTES`, also update
-  `BRIEF_QUESTIONS` / `BRIEF_MINUTES` in `AssessmentPortal.jsx` — the start screen
+  the matching entry in `BRIEF` in `AssessmentPortal.jsx` — the start screen
   briefs the candidate before the server has said anything.
 
 ### Current paper — `HAG-WALKIN-L1-v5`
 
-15 questions · 15 marks · 20 minutes · no negative marking.
+15 questions · 15 marks · 15 minutes · no negative marking.
 
 | Section | Name | Q | Marks |
 |---|---|---|---|

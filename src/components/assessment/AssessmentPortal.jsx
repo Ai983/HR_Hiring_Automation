@@ -42,7 +42,7 @@ const STORAGE_KEYS = {
 // role-assessment-bank.ts. The timer and the marking follow the server; this is
 // only the briefing.
 const BRIEF = {
-  L1:   { questions: 15, minutes: 20, title: "First-Level Assessment" },
+  L1:   { questions: 15, minutes: 15, title: "First-Level Assessment" },
   ROLE: { questions: 12, minutes: 15, title: "Role Assessment" },
 };
 

@@ -6,7 +6,7 @@
 // browser downloads. Everything the candidate page receives goes through
 // publicQuestions(), which strips `answer` and `explanation`.
 //
-// HAG-WALKIN-L1-v5 — 15 questions, 15 marks, 20 minutes.
+// HAG-WALKIN-L1-v5 — 15 questions, 15 marks, 15 minutes.
 //
 // WHAT THIS PAPER IS, AND WHAT IT IS NOT
 // v5 reads like a DISC-style personality questionnaire — plain language, general
@@ -45,7 +45,18 @@
 
 export const ASSESSMENT_ID = "HAG-WALKIN-L1-v5";
 export const TOTAL_QUESTIONS = 15;
-export const DURATION_MINUTES = 20;
+// 20 → 15 on 21 Aug 2026, the evening before the drive. The questions are
+// unchanged, so this is NOT a version bump (§7.4 versions the PAPER, and the
+// paper is the same): a v6 here would orphan the five attempts already sat and
+// break comparability for no reason. What it does change is throughput — with
+// level 2 now added, a candidate sat 20 + 15; this brings the pair to 30 min,
+// which §7.5 flags as the real constraint on a walk-in queue.
+//
+// Safe because every stored attempt keeps its own score, and ends_at is
+// computed per request from started_at — so this only affects papers started
+// after it went live. Applied when no attempt was in progress; do NOT change it
+// mid-session or a candidate's clock shortens under them.
+export const DURATION_MINUTES = 15;
 // A slow phone on venue Wi-Fi must not cost a candidate their paper.
 export const GRACE_SECONDS = 60;
 

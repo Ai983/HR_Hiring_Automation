@@ -161,7 +161,7 @@ candidates to bring a printed CV to the venue.
                   (walk-ins without prior registration are allowed — register on the spot)
 3. ASSESSMENT   → LEVEL 1: send them to /test.html on their phone. They enter
    (level 1)      their email and name, and sit the 15-question paper (§5.4).
-                  20 min. Invigilated. COLLECT PHONES — not AI-proof (§5.4).
+                  15 min. Invigilated. COLLECT PHONES — not AI-proof (§5.4).
                   If the Wi-Fi is down, issue the printed 13-question paper (§5.0).
 4. ASSESSMENT   → LEVEL 2: same phone, /test2.html. Same email and name, plus the
    (level 2)      POSITION they applied for — that is what selects their paper.
@@ -176,7 +176,8 @@ candidates to bring a printed CV to the venue.
 ```
 
 **Level 2 is optional on a busy day.** It is 15 more minutes per candidate on a
-queue that §7.5 already flags as time-constrained. If the hall backs up, run more
+queue that §7.5 already flags as time-constrained — the pair is 30 minutes since
+level 1 was cut from 20 to 15 on 21 Aug. If the hall backs up, run more
 devices; if that is not enough, level 1 alone still produces the queue order.
 
 **Assessment is a queue-prioritisation tool, not a gate.** See §6.3.
@@ -189,7 +190,7 @@ devices; if that is not enough, level 1 alone still produces the queue order.
 >
 > | | `HAG-WALKIN-L1-v1` | `HAG-WALKIN-L1-v5` |
 > |---|---|---|
-> | Format | 13 questions · 15 min | **15 questions · 20 min** |
+> | Format | 13 questions · 15 min | **15 questions · 15 min** |
 > | Tests | Arithmetic, reasoning, site vocabulary | **General workplace behaviour and judgement** |
 > | Sections | A 5 · B 3 · C 5 | A 4 · B 4 · C 4 · D 3 |
 > | Delivery | Printed paper, hand-marked | **Online, auto-marked** |
@@ -356,7 +357,7 @@ deliberately easy and contains **no role-specific technical content**.
 
 ### 5.4 v5 — the live online paper (`HAG-WALKIN-L1-v5`)
 
-**Format:** 15 MCQs · 1 mark each · 15 marks · 20 minutes · no negative marking
+**Format:** 15 MCQs · 1 mark each · 15 marks · 15 minutes · no negative marking
 
 | Section | Name | Q | Marks |
 |---|---|---|---|
@@ -554,10 +555,10 @@ knowing:
 |-------------|--------------|
 | Question order | Fixed — sections are meaningful and the paper version must match. |
 | Option order | Shuffled within each question. The presented order is stored on the attempt. |
-| Timer | 20 minutes, visible, counted against the **server's** `ends_at` (client clocks on borrowed phones are not trustworthy). Auto-submits on expiry. |
+| Timer | 15 minutes, visible, counted against the **server's** `ends_at` (client clocks on borrowed phones are not trustworthy). Auto-submits on expiry. |
 | Navigation | Back/forward, plus a 15-cell palette showing what is answered. No penalty for changing an answer. |
 | Partial submit | Whatever is answered is scored; unanswered = 0. No negative marking. Past the timer the paper is still marked and flagged `auto_submitted` — a candidate never loses their work to a slow phone. |
-| Resume | An attempt in progress resumes on the **same** token, paper and remaining time. A refresh, a dead battery or a dropped connection does not cost a fresh attempt or a fresh 20 minutes. Answers mirror to `localStorage` on every tap. |
+| Resume | An attempt in progress resumes on the **same** token, paper and remaining time. A refresh, a dead battery or a dropped connection does not cost a fresh attempt or a fresh 15 minutes. Answers mirror to `localStorage` on every tap. |
 | Retake | **One attempt per candidate per drive.** Re-opening with a used email shows the earlier score and directs them to the HR desk. HR clicks **Allow retake** in the Assessment panel to grant exactly one re-sit; the unlock is consumed by the next start, so it cannot become unlimited re-sits. |
 | Device | Built for a low-end Android: one question per screen, 44px+ tap targets, 16px inputs, no hover-only cues. |
 | Offline fallback | The printed v1 paper (§5.0, §5.5) stays in use. If the venue Wi-Fi fails, HR switches to paper without losing the day. |
@@ -618,7 +619,7 @@ whose questions are chosen by the position the candidate applied for.
 | Start screen asks | email · name | email · name · **position applied for** |
 | Papers | one, sat by all 13 positions | **13**, one per position (§2.2) |
 | Content | general workplace behaviour | role-specific, medium difficulty |
-| Length | 15 Q · 15 marks · 20 min | 12 Q · 12 marks · 15 min |
+| Length | 15 Q · 15 marks · 15 min | 12 Q · 12 marks · 15 min |
 | Sections | 4, fixed | 4, **different per paper** |
 | Bands | 13 / 9 / 6 | 9 / 6 / 4 |
 | Paper id | `HAG-WALKIN-L1-v5` | `HAG-ROLE-<POSITION>-v1` |
