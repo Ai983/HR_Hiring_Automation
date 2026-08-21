@@ -7,6 +7,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [busy, setBusy]         = useState(false);
   const [err, setErr]           = useState("");
+  const [showPw, setShowPw]     = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -39,8 +40,29 @@ export default function Login() {
         </div>
         <div className="form-field" style={{ marginBottom: 18 }}>
           <label className="form-label">Password</label>
-          <input className="form-input" type="password" autoComplete="current-password" placeholder="••••••••"
-            value={password} onChange={(e) => setPassword(e.target.value)} />
+          {/* Reveal toggle. Sits inside the field rather than beside it so the
+              input keeps its full width, and padding-right keeps typed text
+              from running under the button. */}
+          <div style={{ position: "relative" }}>
+            <input className="form-input" type={showPw ? "text" : "password"}
+              autoComplete="current-password" placeholder="••••••••"
+              style={{ paddingRight: 44, width: "100%" }}
+              value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button
+              type="button"
+              onClick={() => setShowPw((s) => !s)}
+              tabIndex={-1}
+              aria-label={showPw ? "Hide password" : "Show password"}
+              title={showPw ? "Hide password" : "Show password"}
+              style={{
+                position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", cursor: "pointer",
+                padding: "6px 8px", fontSize: 16, lineHeight: 1, color: "#8a7e72",
+              }}
+            >
+              {showPw ? "🙈" : "👁"}
+            </button>
+          </div>
         </div>
 
         {err && <div style={{ background: "#fff1f0", border: "1px solid #fecaca", borderRadius: 9, padding: "10px 14px", fontSize: 13, color: "#dc2626", marginBottom: 14 }}>{err}</div>}
