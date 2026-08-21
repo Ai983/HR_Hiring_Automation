@@ -240,31 +240,43 @@ button,.as-option,.as-cell{
 /* ── Short screens: landscape, and split-screen ───────────────────────
    A phone held sideways leaves ~360px of height. The sticky top bar and the
    FIXED bottom bar between them eat well over a third of that, and because the
-   bottom bar is taken out of the flow it sits ON TOP of the options — so an
-   option scrolled to the middle of the remaining strip can end up underneath it
-   and simply refuse to take a tap. Caught by scripts/e2e-assessment.mjs at
-   640x360; every portrait size was already fine.
+   bottom bar is out of the flow it sits ON TOP of the options — so an option
+   scrolled into the middle of the remaining strip ends up underneath it and
+   silently refuses the tap. Caught by scripts/e2e-assessment.mjs at 640x360;
+   every portrait size (320, 360, 390, 412) was already fine.
 
-   The fix is to stop the bars overlaying anything once there is no height to
-   spare: `position:sticky` keeps them both on screen exactly as before, but
-   they occupy real space in the flex column, so content can never hide beneath
-   them. The 100px of bottom padding that existed only to clear the fixed bar
-   then becomes dead space, so it goes too, which buys back another line of
-   question text. Vertical paddings shrink for the same reason.
+   `position:sticky` does NOT fix this: a stuck element is still painted over
+   the content it scrolls past. The only layout where the bars cannot overlap
+   anything is one where they are not in the scrolling box at all. So under
+   500px of height the page becomes a fixed-height flex column — bar, scroller,
+   bar — and THE QUESTION AREA does the scrolling instead of the document.
+   Nothing can then hide beneath either bar, and the 100px of bottom padding
+   that existed only to clear the fixed bar becomes dead space and goes, which
+   buys back a line of question text.
 
-   Candidates are told to hold the phone upright, but a drive is not the place
-   to rely on that. */
+   Candidates are told to hold the phone upright. A drive is not the place to
+   rely on that. */
 @media (max-height: 500px) {
-  .as-topbar{position:sticky;padding-top:calc(7px + env(safe-area-inset-top));padding-bottom:7px;}
+  .as-test{height:100dvh;overflow:hidden;}
+
+  .as-topbar{position:static;flex-shrink:0;
+             padding-top:calc(7px + env(safe-area-inset-top));padding-bottom:7px;}
   .as-timer{font-size:17px;padding:4px 10px;}
 
-  .as-navbar{position:sticky;margin-top:auto;padding:7px 12px;
+  /* min-height:0 is what lets a flex child actually shrink and scroll. */
+  .as-question{flex:1 1 auto;min-height:0;overflow-y:auto;
+               -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+               padding:12px 16px;}
+
+  .as-navbar{position:static;flex-shrink:0;padding:7px 12px;
              padding-bottom:calc(7px + env(safe-area-inset-bottom));}
   .as-navbar .as-btn{min-height:40px;padding:8px 14px;}
 
-  .as-question{padding:12px 16px 12px;}
   .as-scenario{padding:10px 12px;margin-bottom:10px;}
   .as-qtext{margin-bottom:10px;}
   .as-options{gap:7px;}
   .as-option{padding:9px 12px;min-height:42px;}
+
+  /* The error toast is anchored to the old fixed bar's height. */
+  .as-error-fixed{bottom:64px;}
 }

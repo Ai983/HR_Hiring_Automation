@@ -89,13 +89,15 @@ async function assertOptionsUsable(page, where) {
     if (!box) { bad(`${where}: option ${i + 1} has no box`); continue; }
     if (box.height < 40) bad(`${where}: option ${i + 1} is only ${Math.round(box.height)}px tall (min 40)`);
     if (box.x < -1 || box.x + box.width > vw + 1) bad(`${where}: option ${i + 1} overflows horizontally`);
-    const hit = await opts[i].evaluate((el) => {
-      const b = el.getBoundingClientRect();
-      const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-      if (top && (top === el || el.contains(top))) return "ok";
-      return top ? (top.className || top.tagName) : "nothing";
-    });
-    if (hit !== "ok") bad(`${where}: option ${i + 1} is not tappable after scrolling — "${hit}" is on top`);
+    // Playwright's own actionability check: scrolls, waits for stability, and
+    // hit-tests the point it would actually dispatch the tap at. This is the
+    // authoritative answer to "can a thumb press this?" — it is what a real
+    // click does, minus the click.
+    try {
+      await opts[i].click({ trial: true, timeout: 3000 });
+    } catch (e) {
+      bad(`${where}: option ${i + 1} cannot receive a tap: ${String(e).split(String.fromCharCode(10))[0].slice(0, 90)}`);
+    }
   }
 }
 
@@ -246,10 +248,18 @@ async function runPaper(browser, vp, kind) {
   await page.fill("#as-name", `E2E ${label} ${vp.width}`);
   if (kind === "ROLE") await page.locator("#as-position").selectOption(position);
   await page.click(".as-btn-primary");
-  await page.waitForTimeout(3500);
-  const blocked = await page.locator(".as-card").innerText();
-  if (!/already taken this test/i.test(blocked)) bad("a second attempt was NOT blocked");
-  else ok("second attempt blocked");
+  // Wait for a definite outcome rather than a fixed sleep: either the blocked
+  // card, the paper (which would be the bug), or an error the desk would see.
+  try {
+    await page.waitForFunction(() => {
+      const t = document.body.innerText || "";
+      return /already taken this test/i.test(t) || document.querySelector(".as-option") || /as-error/.test(document.body.innerHTML);
+    }, { timeout: 20000 });
+  } catch { /* fall through to the assertion below */ }
+  const blockedText = await page.locator(".as-shell").innerText();
+  if (/already taken this test/i.test(blockedText)) ok("second attempt blocked");
+  else if (await page.locator(".as-option").count()) bad("a second attempt was ALLOWED — the one-attempt block failed");
+  else bad(`second attempt: neither blocked nor started — "${blockedText.replace(/\s+/g, " ").slice(0, 110)}"`);
   await page.screenshot({ path: `${SHOTS}/${kind}-${vp.width}-5-blocked.png` });
 
   if (consoleErrors.length) {
