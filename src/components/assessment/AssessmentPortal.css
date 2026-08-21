@@ -236,3 +236,35 @@ button,.as-option,.as-cell{
 }
 .as-bar{height:7px;border-radius:4px;background:#f2ede6;overflow:hidden;}
 .as-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#e8a24a,#c97a2a);}
+
+/* ── Short screens: landscape, and split-screen ───────────────────────
+   A phone held sideways leaves ~360px of height. The sticky top bar and the
+   FIXED bottom bar between them eat well over a third of that, and because the
+   bottom bar is taken out of the flow it sits ON TOP of the options — so an
+   option scrolled to the middle of the remaining strip can end up underneath it
+   and simply refuse to take a tap. Caught by scripts/e2e-assessment.mjs at
+   640x360; every portrait size was already fine.
+
+   The fix is to stop the bars overlaying anything once there is no height to
+   spare: `position:sticky` keeps them both on screen exactly as before, but
+   they occupy real space in the flex column, so content can never hide beneath
+   them. The 100px of bottom padding that existed only to clear the fixed bar
+   then becomes dead space, so it goes too, which buys back another line of
+   question text. Vertical paddings shrink for the same reason.
+
+   Candidates are told to hold the phone upright, but a drive is not the place
+   to rely on that. */
+@media (max-height: 500px) {
+  .as-topbar{position:sticky;padding-top:calc(7px + env(safe-area-inset-top));padding-bottom:7px;}
+  .as-timer{font-size:17px;padding:4px 10px;}
+
+  .as-navbar{position:sticky;margin-top:auto;padding:7px 12px;
+             padding-bottom:calc(7px + env(safe-area-inset-bottom));}
+  .as-navbar .as-btn{min-height:40px;padding:8px 14px;}
+
+  .as-question{padding:12px 16px 12px;}
+  .as-scenario{padding:10px 12px;margin-bottom:10px;}
+  .as-qtext{margin-bottom:10px;}
+  .as-options{gap:7px;}
+  .as-option{padding:9px 12px;min-height:42px;}
+}
