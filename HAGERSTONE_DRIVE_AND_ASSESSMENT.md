@@ -160,7 +160,7 @@ candidates to bring a printed CV to the venue.
 2. VERIFY       → Check photo ID; confirm they appear in the response Sheet
                   (walk-ins without prior registration are allowed — register on the spot)
 3. ASSESSMENT   → Send them to /test.html on their phone. They enter their email
-                  and name, and sit the 25-question paper (§5.4). 35 min. Invigilated.
+                  and name, and sit the 20-question paper (§5.4). 25 min. Invigilated.
                   COLLECT PHONES — the paper is not AI-proof (§5.4).
                   If the Wi-Fi is down, issue the printed 13-question paper (§5.0).
 4. MARK         → Online: marked automatically, score on screen at submit, and in
@@ -178,16 +178,16 @@ candidates to bring a printed CV to the venue.
 
 > **Read this before using any version.**
 >
-> | | `HAG-WALKIN-L1-v1` | `HAG-WALKIN-L1-v3` |
+> | | `HAG-WALKIN-L1-v1` | `HAG-WALKIN-L1-v4` |
 > |---|---|---|
-> | Format | 13 questions · 15 min | **25 questions · 35 min** |
+> | Format | 13 questions · 15 min | **20 questions · 25 min** |
 > | Tests | Arithmetic, reasoning, site vocabulary | **Situational judgement, procedure, client handling** |
-> | Sections | A 5 · B 3 · C 5 | A 5 · B 6 · C 6 · D 4 · E 4 |
+> | Sections | A 5 · B 3 · C 5 | A 4 · B 5 · C 5 · D 3 · E 3 |
 > | Delivery | Printed paper, hand-marked | **Online, auto-marked** |
 > | Where | §5.0 below | §5.4 below |
 > | Use it for | Wi-Fi failure fallback | **The 22 Aug drive** |
 >
-> **v3 is the paper the drive runs on.** v1 is retained verbatim as the offline
+> **v4 is the paper the drive runs on.** v1 is retained verbatim as the offline
 > fallback required by §7.3 — if the venue Wi-Fi dies, HR issues the printed
 > sheet and the day continues. Scores across versions are not comparable;
 > `assessment_id` on the attempt records which paper a candidate sat.
@@ -345,61 +345,60 @@ deliberately easy and contains **no role-specific technical content**.
 |---|---|---|---|---|---|---|---|---|---|----|----|----|----|
 | **Ans** | C | C | B | B | C | C | C | B | B | C | A | B | C |
 
-### 5.4 v3 — the live online paper (`HAG-WALKIN-L1-v3`)
+### 5.4 v4 — the live online paper (`HAG-WALKIN-L1-v4`)
 
-**Format:** 25 MCQs · 1 mark each · 25 marks · 35 minutes · no negative marking
+**Format:** 20 MCQs · 1 mark each · 20 marks · 25 minutes · no negative marking
 
 | Section | Name | Q | Marks |
 |---|---|---|---|
-| A | Site Execution & Sequencing | 1–5 | 5 |
-| B | Client & Stakeholder Handling | 6–11 | 6 |
-| C | Procedure & Documentation | 12–17 | 6 |
-| D | Commercial Judgement | 18–21 | 4 |
-| E | Safety & Problem Diagnosis | 22–25 | 4 |
+| A | Site Execution & Sequencing | 1–4 | 4 |
+| B | Client & Stakeholder Handling | 5–9 | 5 |
+| C | Procedure & Documentation | 10–14 | 5 |
+| D | Commercial Judgement | 15–17 | 3 |
+| E | Safety & Problem Diagnosis | 18–20 | 3 |
 
-**Every question is a situation.** The candidate is put in a real position and
-asked what they would **do**, what procedure they would follow, or how they
-would handle a client. The distractors are the mistakes people actually make on
-site — the shortcut, the people-pleasing answer, the rigid rule-follower answer,
-the "not my worker" answer — so a candidate cannot reach the right option by
-elimination without having lived it.
+**Every question is a short situation.** The candidate is asked what they would
+**do**, what procedure they would follow, or how they would handle a client. The
+register is plain and the wrong options are clearly wrong — do nothing, hide it,
+cut the corner, blame someone.
 
-The four Section D questions are numerical, but the arithmetic sits inside a
-commercial situation (a BOQ variation, an LD calculation, a landed-cost
-comparison, a material reconciliation) rather than being asked bare. They test
-whether someone can reason about money on a project, not whether they can
-multiply.
+The three Section D questions are numerical but single-step, and the arithmetic
+sits inside a commercial situation (extra work at an agreed rate, a two-vendor
+comparison, a cement reconciliation) rather than being asked bare.
 
-**Why v2 was replaced.** v1 and v2 tested arithmetic, general reasoning and site
-vocabulary. "What does BOQ stand for" separates people who have read a glossary
-from people who have not — it does not separate people who can run a site from
-people who cannot. v3 was rebuilt around the failure modes these projects
-actually have: undocumented verbal variations, late bad news to the client,
-uncontrolled drawing revisions, unverified GRNs, buried near misses, and
-repeat-repairing a symptom instead of finding the cause.
+**⚠️ v4 is easier than v3 by design, and that costs discrimination.** An easy
+paper clusters scores near the top, and a score everybody gets 17+ on cannot
+decide who the panel sees first — which is the only thing this score is for
+(§6.3). **If the spread on the day is too tight, re-cut the bands** in
+`bandFor()` against real attempt data. Bands can change freely; questions cannot
+once they have been sat (§7.4).
 
-**Still no role-specific technical content** (§7.5). All 13 positions sit the
-same paper. The situations are drawn from interior fit-out, façade, civil and
-PEB work because that is the business, but every correct answer turns on
-judgement, procedure or commercial sense rather than trade knowledge.
+**⚠️ It is not AI-proof, and cannot be made so.** A language model answers
+situational-judgement questions very well — easier questions, if anything, more
+easily. **Invigilation — phones collected at the desk — is the control.**
 
-**⚠️ It is not AI-proof, and cannot be made so.** A large language model answers
-situational-judgement questions very well — better than most candidates.
-Question design only makes the paper hard to answer *without real experience*,
-which is what makes it discriminate between humans. **Invigilation — phones
-collected at the desk — is the control for AI.** Do not rely on the questions
-for that.
+**No role-specific technical content** (§7.5). All 13 positions sit the same
+paper; every answer turns on judgement or basic procedure, not trade knowledge.
 
 **Canonical source of the questions and the key:**
-`supabase/functions/_shared/assessment-bank.ts`.
-That file is **server-only** — it is imported by the `assessment` edge function
-and never bundled into anything a browser downloads. Do not copy the answers
-into any client-side file. To produce a printed v3 sheet, read the questions
-from that module and omit `answer` / `explanation`.
+`supabase/functions/_shared/assessment-bank.ts`. That file is **server-only** —
+imported by the `assessment` edge function, never bundled into a browser. Do not
+copy the answers into any client-side file.
+
+**Printed answer key:** `npm run assessment:pdf` regenerates
+`Hagerstone_Walkin_Assessment_v4_20Q_ANSWER_KEY.pdf` from that module — every
+question, the correct option, the reasoning, the key table and the bands are
+derived, so the sheet cannot drift from the live test. **Evaluator only.** Note
+that the A/B/C/D letters in it are the canonical order; the online test shuffles
+options per candidate, so match by option text, not by letter.
 
 **Where candidates sit it:** `https://hr-hiring-automation.vercel.app/test.html`
 No login. The candidate types an email address and their full name; the email is
 the key that separates one person's answers and score from another's. See §7.
+
+**Superseded versions — do not reuse these ids.** v2 (20 Q) tested arithmetic and
+site vocabulary. v3 (25 Q, 35 min) was situational but judged too hard and too
+slow for a walk-in queue. Their attempts stay readable and re-markable.
 
 ### 5.5 v1 printed paper
 
@@ -416,14 +415,14 @@ Footer: candidate declaration + signature, date, invigilator signature.
 
 ### 6.1 Bands
 
-**v3 — 25 marks (the live online paper):**
+**v4 — 20 marks (the live online paper):**
 
 | Score | % | Band | Action |
 |-------|---|------|--------|
-| 21–25 | 85%+ | STRONG | Shortlist — send to technical panel first |
-| 15–20 | 60%+ | AVERAGE | Proceed to interview normally |
-| 10–14 | 40%+ | WEAK | Judge by role and experience |
-| 0–9 | <40% | BELOW_BAR | Interview only if experience is strong |
+| 17–20 | 85%+ | STRONG | Shortlist — send to technical panel first |
+| 12–16 | 60%+ | AVERAGE | Proceed to interview normally |
+| 8–11 | 40%+ | WEAK | Judge by role and experience |
+| 0–7 | <40% | BELOW_BAR | Interview only if experience is strong |
 
 **v1 — 13 marks (the printed fallback):**
 
@@ -434,13 +433,13 @@ Footer: candidate declaration + signature, date, invigilator signature.
 | 5–7 | Weak | Judge by role and experience |
 | 0–4 | Below bar | Interview only if experience is strong |
 
-The v3 cuts are the v1 cuts rescaled to the same percentages, so a STRONG on
+The v4 cuts are the v1 cuts rescaled to the same percentages, so a STRONG on
 any version means roughly the same thing. `assessment_id` on the attempt records
 which paper was sat.
 
 ### 6.2 Section-level reading
 
-Worth recording section scores separately, not just the total. v3 stores all
+Worth recording section scores separately, not just the total. v4 stores all
 five; the Assessment panel shows them per candidate. What each pattern means:
 
 - **B low (Client & Stakeholder Handling)** → will need supervision in front of a
@@ -541,14 +540,14 @@ knowing:
 |-------------|--------------|
 | Question order | Fixed — sections are meaningful and the paper version must match. |
 | Option order | Shuffled within each question. The presented order is stored on the attempt. |
-| Timer | 35 minutes, visible, counted against the **server's** `ends_at` (client clocks on borrowed phones are not trustworthy). Auto-submits on expiry. |
-| Navigation | Back/forward, plus a 25-cell palette showing what is answered. No penalty for changing an answer. |
+| Timer | 25 minutes, visible, counted against the **server's** `ends_at` (client clocks on borrowed phones are not trustworthy). Auto-submits on expiry. |
+| Navigation | Back/forward, plus a 20-cell palette showing what is answered. No penalty for changing an answer. |
 | Partial submit | Whatever is answered is scored; unanswered = 0. No negative marking. Past the timer the paper is still marked and flagged `auto_submitted` — a candidate never loses their work to a slow phone. |
-| Resume | An attempt in progress resumes on the **same** token, paper and remaining time. A refresh, a dead battery or a dropped connection does not cost a fresh attempt or a fresh 35 minutes. Answers mirror to `localStorage` on every tap. |
+| Resume | An attempt in progress resumes on the **same** token, paper and remaining time. A refresh, a dead battery or a dropped connection does not cost a fresh attempt or a fresh 25 minutes. Answers mirror to `localStorage` on every tap. |
 | Retake | **One attempt per candidate per drive.** Re-opening with a used email shows the earlier score and directs them to the HR desk. HR clicks **Allow retake** in the Assessment panel to grant exactly one re-sit; the unlock is consumed by the next start, so it cannot become unlimited re-sits. |
 | Device | Built for a low-end Android: one question per screen, 44px+ tap targets, 16px inputs, no hover-only cues. |
 | Offline fallback | The printed v1 paper (§5.0, §5.5) stays in use. If the venue Wi-Fi fails, HR switches to paper without losing the day. |
-| What the candidate sees | Total score out of 25 and the five section scores. **Not** the band, and **not** the correct answers — the band is an internal routing signal (§6.3), and printing the key on screen would leak the paper across the hall within an hour. |
+| What the candidate sees | Total score out of 20 and the five section scores. **Not** the band, and **not** the correct answers — the band is an internal routing signal (§6.3), and printing the key on screen would leak the paper across the hall within an hour. |
 
 ### 7.4 Versioning
 
@@ -595,7 +594,7 @@ the same call shape as `screen-resume`.
 | Asset | File / Location | Notes |
 |-------|-----------------|-------|
 | Carousel posters (14) | `Drive_22Aug_Card01..14_*.png` | 2160×2160, 1:1 |
-| Online assessment | `/test.html` on the hiring app | v3 · 25 Q · live · see §7 |
+| Online assessment | `/test.html` on the hiring app | v4 · 20 Q · live · see §7 |
 | Question bank + key | `supabase/functions/_shared/assessment-bank.ts` | **Server-only. Never publish.** |
 | Assessment paper (v1) | `Hagerstone_Walkin_Assessment_13Q.pdf` | 3 pages · Wi-Fi-failure fallback |
 | Indeed listing | `Hagerstone_Indeed_Job_Posting.docx` | Ready to paste |

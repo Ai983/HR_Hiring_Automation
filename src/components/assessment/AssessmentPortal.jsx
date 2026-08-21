@@ -17,14 +17,14 @@ import "./AssessmentPortal.css";
 
 // Bumped with the paper version so a half-finished v2 sheet cached on a phone
 // can never be restored on top of the v3 paper.
-const SESSION_KEY = "hag_assessment_session_v3";
-const ANSWERS_KEY = "hag_assessment_answers_v3";
+const SESSION_KEY = "hag_assessment_session_v4";
+const ANSWERS_KEY = "hag_assessment_answers_v4";
 
 // Shown on the start screen, before the server has told us anything. Keep in
 // step with TOTAL_QUESTIONS / DURATION_MINUTES in assessment-bank.ts — the
 // timer and the marking follow the server, this is only the briefing.
-const BRIEF_QUESTIONS = 25;
-const BRIEF_MINUTES = 35;
+const BRIEF_QUESTIONS = 20;
+const BRIEF_MINUTES = 25;
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 const readJson = (key) => {

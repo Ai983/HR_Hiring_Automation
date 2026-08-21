@@ -5,13 +5,13 @@ import {
 } from "../../services/assessmentService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
-// Mirrors SECTIONS in supabase/functions/_shared/assessment-bank.ts (v3).
+// Mirrors SECTIONS in supabase/functions/_shared/assessment-bank.ts (v4).
 const SECTION_META = [
-  { key: "score_section_a", id: "A", name: "Site Execution", count: 5 },
-  { key: "score_section_b", id: "B", name: "Client Handling", count: 6 },
-  { key: "score_section_c", id: "C", name: "Procedure & Docs", count: 6 },
-  { key: "score_section_d", id: "D", name: "Commercial", count: 4 },
-  { key: "score_section_e", id: "E", name: "Safety & Diagnosis", count: 4 },
+  { key: "score_section_a", id: "A", name: "Site Execution", count: 4 },
+  { key: "score_section_b", id: "B", name: "Client Handling", count: 5 },
+  { key: "score_section_c", id: "C", name: "Procedure & Docs", count: 5 },
+  { key: "score_section_d", id: "D", name: "Commercial", count: 3 },
+  { key: "score_section_e", id: "E", name: "Safety & Diagnosis", count: 3 },
 ];
 
 function fmtDT(iso) {
@@ -200,7 +200,7 @@ export default function AssessmentResults() {
     ? (submitted.reduce((s, r) => s + (r.score_total || 0), 0) / submitted.length).toFixed(1)
     : "—";
   const strong = submitted.filter((r) => r.band === "STRONG").length;
-  const strongCut = 21; // v3: 21+/25. See bandFor() in assessment-bank.ts.
+  const strongCut = 17; // v4: 17+/20. See bandFor() in assessment-bank.ts.
 
   const exportCSV = () => {
     const rowsOut = [[

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "assessment:pdf": "node --experimental-strip-types scripts/make-assessment-pdf.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
+    "playwright-core": "^1.62.1",
     "supabase": "^2.78.1",
     "vite": "^5.2.0"
   }
