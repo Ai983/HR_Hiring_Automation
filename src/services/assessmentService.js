@@ -11,8 +11,8 @@ import { supabase } from "../supabaseClient.js";
 // Kept in step with supabase/functions/_shared/assessment-bank.ts. TOTAL_MARKS
 // is only used for the "n / 25" labels; the stored scores are authoritative and
 // a v2 attempt (20 marks) still renders correctly from its own `review`.
-export const ASSESSMENT_ID = "HAG-WALKIN-L1-v4";
-export const TOTAL_MARKS = 20;
+export const ASSESSMENT_ID = "HAG-WALKIN-L1-v5";
+export const TOTAL_MARKS = 15;
 
 // Attempts are never migrated between versions (§7.3), so the panel will show
 // v2 and v3 rows side by side for a while. Score out of the paper the candidate
@@ -21,6 +21,7 @@ const PAPER_MARKS = {
   "HAG-WALKIN-L1-v2": 20,
   "HAG-WALKIN-L1-v3": 25,
   "HAG-WALKIN-L1-v4": 20,
+  "HAG-WALKIN-L1-v5": 15,
 };
 export const marksFor = (assessmentId) => PAPER_MARKS[assessmentId] ?? TOTAL_MARKS;
 
