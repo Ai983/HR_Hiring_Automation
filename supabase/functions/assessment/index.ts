@@ -44,6 +44,8 @@ import {
   GRACE_SECONDS,
   TOTAL_QUESTIONS,
   SECTIONS,
+  QUESTIONS,
+  BANDS as L1_BANDS,
   buildPresented,
   publicQuestions,
   toCanonicalAnswers,
@@ -55,6 +57,7 @@ import {
   ROLE_DURATION_MINUTES,
   ROLE_GRACE_SECONDS,
   ROLE_POSITION_LIST,
+  ROLE_BANDS,
   paperForPosition,
   buildRolePresented,
   publicRoleQuestions,
@@ -333,6 +336,78 @@ Deno.serve(async (req) => {
     // ────────────────────────────────────────────────────────────────────────
     if (action === "positions") {
       return json({ ok: true, positions: ROLE_POSITION_LIST });
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // PAPER — the full paper INCLUDING the answer key and explanations, for HR
+    // to review and sign off (§9.3).
+    //
+    // This is the only action that returns answers, and it is the reason the
+    // key still never has to sit in a browser bundle: the reviewer fetches it
+    // at runtime, authenticated, instead of the app shipping it to everyone.
+    //
+    // Edge functions bypass RLS by design and must do their own authorisation
+    // (CLAUDE.md hard rule 4). So unlike start/submit — which are deliberately
+    // anonymous — this one demands a real Hub session AND the hireflow module,
+    // which is the same gate the Assessment panel already sits behind. anon
+    // calling this gets 401, and an attendance-only user gets 403.
+    // ────────────────────────────────────────────────────────────────────────
+    if (action === "paper") {
+      const authHeader = req.headers.get("Authorization") ?? "";
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const authClient = createClient(Deno.env.get("SUPABASE_URL")!, anonKey, {
+        db: { schema: "hr" },
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      // The candidate pages call every action with the bare anon key, which is
+      // a valid project JWT but has no user — getUser() is what separates a
+      // signed-in reviewer from a candidate's phone.
+      const { data: { user }, error: userErr } = await authClient.auth.getUser();
+      if (userErr || !user) return json({ error: "Not signed in." }, 401);
+
+      // Evaluated as the caller, not as the service role: has_hireflow() is
+      // security definer over auth.uid().
+      const { data: allowed, error: rpcErr } = await authClient.rpc("has_hireflow");
+      if (rpcErr) return json({ error: "Could not check your access.", details: rpcErr.message }, 500);
+      if (allowed !== true) return json({ error: "You do not have access to the question bank." }, 403);
+
+      const kind = String(body?.kind ?? "L1").toUpperCase() === "ROLE" ? "ROLE" : "L1";
+      if (kind === "L1") {
+        return json({
+          ok: true,
+          paper_kind: "L1",
+          assessment_id: ASSESSMENT_ID,
+          position: null,
+          duration_minutes: DURATION_MINUTES,
+          total_questions: TOTAL_QUESTIONS,
+          sections: SECTIONS,
+          bands: L1_BANDS,
+          // Canonical order, with the answer index — this is the review view,
+          // not a paper being sat, so nothing is shuffled.
+          questions: QUESTIONS,
+        });
+      }
+
+      const paper = paperForPosition(String(body?.position ?? ""));
+      if (!paper) {
+        return json({
+          error: "That position was not recognised.",
+          positions: ROLE_POSITION_LIST.map((p) => p.position),
+        }, 400);
+      }
+      return json({
+        ok: true,
+        paper_kind: "ROLE",
+        assessment_id: paper.id,
+        position: paper.position,
+        department: paper.department,
+        duration_minutes: ROLE_DURATION_MINUTES,
+        total_questions: paper.questions.length,
+        sections: paper.sections,
+        bands: ROLE_BANDS,
+        questions: paper.questions,
+      });
     }
 
     // ────────────────────────────────────────────────────────────────────────

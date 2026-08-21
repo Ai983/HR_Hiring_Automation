@@ -46,6 +46,7 @@ export default function Sidebar() {
         { id: "applicants",    icon: "◎", label: "Applicants",      badge: newApps },
         { id: "survey",        icon: "📋", label: "Survey Leads",    badge: surveyCount },
         { id: "assessment",    icon: "\u{1F9EE}", label: "Assessment",     badge: assessCount },
+        { id: "questionbank",  icon: "\u{1F4DA}", label: "Question Bank" },
         { id: "calling",       icon: "☎", label: "Calling Queue",   badge: callingQ },
         { id: "interviews",    icon: "\u{1F4C5}", label: "Interviews",    badge: interviews },
         { id: "reference",     icon: "✅", label: "Reference Check", badge: references },

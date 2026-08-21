@@ -2267,11 +2267,17 @@ export const ROLE_POSITION_LIST = ROLE_PAPERS.map((p) => ({
 // actually spent ten years doing.
 export type RoleBand = "STRONG" | "AVERAGE" | "WEAK" | "BELOW_BAR";
 
+// As data, so the HR review page and roleBandFor() cannot drift apart. Ordered
+// highest first — roleBandFor() takes the first match.
+export const ROLE_BANDS: { band: RoleBand; min: number; label: string }[] = [
+  { band: "STRONG",    min: 9, label: "Strong" },
+  { band: "AVERAGE",   min: 6, label: "Average" },
+  { band: "WEAK",      min: 4, label: "Weak" },
+  { band: "BELOW_BAR", min: 0, label: "Below Bar" },
+];
+
 export function roleBandFor(total: number): RoleBand {
-  if (total >= 9) return "STRONG";
-  if (total >= 6) return "AVERAGE";
-  if (total >= 4) return "WEAK";
-  return "BELOW_BAR";
+  return (ROLE_BANDS.find((b) => total >= b.min) ?? ROLE_BANDS[ROLE_BANDS.length - 1]).band;
 }
 
 // ── Presentation, marking and review ─────────────────────────────────────────

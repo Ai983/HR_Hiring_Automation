@@ -20,12 +20,12 @@ const ROLE = await load("supabase/functions/_shared/role-assessment-bank.ts");
 const j = (v) => JSON.stringify(v);
 const questionLines = (qs) => qs.map(j).join(",\n");
 
-const l1Literal = `{\nid: ${j(L1.ASSESSMENT_ID)}, mins: ${L1.DURATION_MINUTES}, grace: ${L1.GRACE_SECONDS},\nsections: ${j(L1.SECTIONS)},\nquestions: [\n${questionLines(L1.QUESTIONS)}\n]}`;
+const l1Literal = `{\nid: ${j(L1.ASSESSMENT_ID)}, mins: ${L1.DURATION_MINUTES}, grace: ${L1.GRACE_SECONDS},\nsections: ${j(L1.SECTIONS)},\nbands: ${j(L1.BANDS)},\nquestions: [\n${questionLines(L1.QUESTIONS)}\n]}`;
 
 const paperLiteral = (p) =>
   `{id: ${j(p.id)}, position: ${j(p.position)}, department: ${j(p.department)},\nsections: ${j(p.sections)},\nquestions: [\n${questionLines(p.questions)}\n]}`;
 
-const roleLiteral = `{\nmins: ${ROLE.ROLE_DURATION_MINUTES}, grace: ${ROLE.ROLE_GRACE_SECONDS},\npapers: [\n${ROLE.ROLE_PAPERS.map(paperLiteral).join(",\n")}\n]}`;
+const roleLiteral = `{\nmins: ${ROLE.ROLE_DURATION_MINUTES}, grace: ${ROLE.ROLE_GRACE_SECONDS},\nbands: ${j(ROLE.ROLE_BANDS)},\npapers: [\n${ROLE.ROLE_PAPERS.map(paperLiteral).join(",\n")}\n]}`;
 
 const out = `// AUTO-GENERATED DEPLOY ARTIFACT — do not edit here.
 // Source of truth: supabase/functions/assessment/index.ts and
@@ -45,8 +45,11 @@ const BY_POS = new Map(ROLE.papers.map((p) => [norm(p.position), p]));
 const paperForPosition = (p) => BY_POS.get(norm(p)) ?? null;
 const POSITION_LIST = ROLE.papers.map((p) => ({ position: p.position, department: p.department, assessment_id: p.id, total_questions: p.questions.length }));
 
-const l1Band = (t) => t >= 13 ? "STRONG" : t >= 9 ? "AVERAGE" : t >= 6 ? "WEAK" : "BELOW_BAR";
-const roleBand = (t) => t >= 9 ? "STRONG" : t >= 6 ? "AVERAGE" : t >= 4 ? "WEAK" : "BELOW_BAR";
+// Derived from the same band tables the review page is shown, so a cut cannot
+// be changed in one place and not the other.
+const bandFrom = (table, t) => (table.find((b) => t >= b.min) ?? table[table.length - 1]).band;
+const l1Band = (t) => bandFrom(L1.bands, t);
+const roleBand = (t) => bandFrom(ROLE.bands, t);
 
 // Question order fixed; options shuffled per candidate. \`presented\` records the
 // order this candidate saw so the attempt stays re-markable.
@@ -147,6 +150,47 @@ Deno.serve(async (req) => {
     const action = body?.action;
 
     if (action === "positions") return json({ ok: true, positions: POSITION_LIST });
+
+    // PAPER — the full paper WITH the answer key, for HR to review and sign off.
+    // The only action that returns answers, and the reason the key never has to
+    // sit in a browser bundle: the reviewer fetches it at runtime, authorised.
+    // Edge functions bypass RLS, so this does its own authorisation — a real Hub
+    // session AND the hireflow module, the same gate as the Assessment panel.
+    if (action === "paper") {
+      const authClient = createClient(
+        Deno.env.get("SUPABASE_URL"),
+        Deno.env.get("SUPABASE_ANON_KEY"),
+        { db: { schema: "hr" }, global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } },
+      );
+      // The candidate pages call with the bare anon key — a valid project JWT
+      // with no user behind it. getUser() is what separates a signed-in
+      // reviewer from a candidate's phone.
+      const { data: { user }, error: userErr } = await authClient.auth.getUser();
+      if (userErr || !user) return json({ error: "Not signed in." }, 401);
+      const { data: allowed, error: rpcErr } = await authClient.rpc("has_hireflow");
+      if (rpcErr) return json({ error: "Could not check your access.", details: rpcErr.message }, 500);
+      if (allowed !== true) return json({ error: "You do not have access to the question bank." }, 403);
+
+      const want = String(body?.kind ?? "L1").toUpperCase() === "ROLE" ? "ROLE" : "L1";
+      if (want === "L1") {
+        return json({
+          ok: true, paper_kind: "L1", assessment_id: L1.id, position: null,
+          duration_minutes: L1.mins, total_questions: L1.questions.length,
+          sections: L1.sections, bands: L1.bands,
+          // Canonical order with the answer index. This is a review view, not a
+          // paper being sat, so nothing is shuffled.
+          questions: L1.questions,
+        });
+      }
+      const paper = paperForPosition(String(body?.position ?? ""));
+      if (!paper) return json({ error: "That position was not recognised.", positions: POSITION_LIST.map((p) => p.position) }, 400);
+      return json({
+        ok: true, paper_kind: "ROLE", assessment_id: paper.id, position: paper.position,
+        department: paper.department, duration_minutes: ROLE.mins,
+        total_questions: paper.questions.length, sections: paper.sections, bands: ROLE.bands,
+        questions: paper.questions,
+      });
+    }
 
     if (action === "start") {
       const email = String(body?.email ?? "").trim().toLowerCase();

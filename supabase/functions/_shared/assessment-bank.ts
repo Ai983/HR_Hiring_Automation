@@ -318,11 +318,19 @@ export const QUESTIONS: Question[] = [
 // downstream may auto-reject on it.
 export type Band = "STRONG" | "AVERAGE" | "WEAK" | "BELOW_BAR";
 
+// The cuts, as data, so the HR review page and bandFor() cannot drift apart.
+// An early version of the answer-key PDF hardcoded a band table and silently
+// kept showing v3's numbers after the paper became v4; nothing is hardcoded
+// twice any more. Ordered highest first — bandFor() takes the first match.
+export const BANDS: { band: Band; min: number; label: string }[] = [
+  { band: "STRONG",    min: 13, label: "Strong" },
+  { band: "AVERAGE",   min: 9,  label: "Average" },
+  { band: "WEAK",      min: 6,  label: "Weak" },
+  { band: "BELOW_BAR", min: 0,  label: "Below Bar" },
+];
+
 export function bandFor(total: number): Band {
-  if (total >= 13) return "STRONG";
-  if (total >= 9) return "AVERAGE";
-  if (total >= 6) return "WEAK";
-  return "BELOW_BAR";
+  return (BANDS.find((b) => total >= b.min) ?? BANDS[BANDS.length - 1]).band;
 }
 
 // ── Presentation order ───────────────────────────────────────────────────────

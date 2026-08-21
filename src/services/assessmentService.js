@@ -6,7 +6,7 @@
 // side never comes through here — see assessmentApi.js.
 // ============================================================
 
-import { supabase } from "../supabaseClient.js";
+import { supabase, supabaseUrl, supabaseAnon } from "../supabaseClient.js";
 
 // Kept in step with supabase/functions/_shared/assessment-bank.ts. TOTAL_MARKS
 // is only used for the "n / 15" labels; the stored scores are authoritative and
@@ -182,6 +182,51 @@ export async function saveNotes(id, notes) {
   if (!supabase) return;
   const { error } = await supabase.from("assessment_attempts").update({ notes }).eq("id", id);
   if (error) throw new Error(error.message || "Could not save notes.");
+}
+
+/**
+ * The full paper INCLUDING the answer key and explanations, for HR review.
+ *
+ * This deliberately does NOT read a local question bank — importing either bank
+ * into anything under src/ would ship 171 answer keys to every candidate's
+ * phone, which is the single invariant this whole design protects. Instead the
+ * `assessment` edge function serves it at runtime to a caller who is signed in
+ * AND has the hireflow module; anon gets 401 and attendance-only gets 403.
+ *
+ * Sends the user's access token rather than the anon key, because the anon key
+ * is a valid project JWT with no user behind it and would fail the check.
+ */
+export async function fetchPaper({ kind = "L1", position } = {}) {
+  if (!supabase) throw new Error("Not configured.");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Please sign in again.");
+
+  const url = `${(supabaseUrl || "").replace(/\/$/, "")}/functions/v1/assessment`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ action: "paper", kind, position: position || undefined }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || `Could not load the paper (${res.status}).`);
+  return data;
+}
+
+/** The 13 level-2 positions, for the review page's picker. Carries no answers. */
+export async function fetchPaperPositions() {
+  if (!supabase) return [];
+  const url = `${(supabaseUrl || "").replace(/\/$/, "")}/functions/v1/assessment`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${supabaseAnon}` },
+    body: JSON.stringify({ action: "positions" }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || "Could not load the positions.");
+  return data?.positions || [];
 }
 
 /** Badge count for the sidebar: papers submitted today. */

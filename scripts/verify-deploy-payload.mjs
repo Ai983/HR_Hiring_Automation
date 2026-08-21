@@ -63,6 +63,8 @@ if (!eq(P.L1.questions, L1BANK.QUESTIONS)) bad("L1 questions differ from assessm
 if (!eq(P.L1.sections, L1BANK.SECTIONS)) bad("L1 sections differ");
 if (P.L1.id !== L1BANK.ASSESSMENT_ID) bad("L1 assessment id differs");
 if (P.L1.mins !== L1BANK.DURATION_MINUTES) bad("L1 duration differs");
+if (!eq(P.L1.bands, L1BANK.BANDS)) bad("L1 band table differs from the bank");
+if (!eq(P.ROLE.bands, ROLEBANK.ROLE_BANDS)) bad("role band table differs from the bank");
 if (!eq(P.ROLE.papers, ROLEBANK.ROLE_PAPERS)) bad("role papers differ from role-assessment-bank.ts");
 if (P.ROLE.mins !== ROLEBANK.ROLE_DURATION_MINUTES) bad("role duration differs");
 if (P.ROLE.papers.length !== 13) bad(`role papers: ${P.ROLE.papers.length}, expected 13`);
