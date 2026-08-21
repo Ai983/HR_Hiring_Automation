@@ -24,6 +24,8 @@ they are shared with live apps.
 | 10 | `20260818093922_hr_leave_approval_ea_only.sql` | `is_leave_approver()` — only EA may write a leave decision; every HR/admin role keeps read access |
 | 11 | `20260819062423_hr_rls_helper_calls_as_initplan.sql` | **performance fix** — policy helper calls were bare, so Postgres re-ran them per row and "My Attendance" hit the 8s `statement_timeout`. Wraps them in `(select …)`; 2390ms → 5ms. Access model unchanged |
 | 12 | `20260819120000_hr_walkin_assessment_attempts.sql` | `assessment_attempts` — the walk-in test (§7 of `HAGERSTONE_DRIVE_AND_ASSESSMENT.md`). Applied 2026-08-19. **No `anon` policy and no `anon` grant** — candidates are anonymous and reach the table only through the service-role `assessment` edge function |
+| 13 | `20260819160000_hr_assessment_v3_five_sections.sql` | `score_section_e`, and the `score_total` ceiling 20 → 25 for the 25-mark v3 paper. The old ceiling would have failed the submit **silently**, for exactly the strongest candidates |
+| 14 | `20260821090000_hr_assessment_role_level2.sql` | the **second-level, position-specific** paper (§7.7 of `HAGERSTONE_DRIVE_AND_ASSESSMENT.md`). Adds `position_applied`, `paper_kind` (`'L1'`/`'ROLE'`) and `section_meta` to the same table, and widens the score ceiling 25 → 50 with headroom so the next paper needs no migration. Additive throughout — every existing level-1 row stays valid and nothing is rewritten. Access model unchanged: still no `anon` policy and no `anon` grant |
 
 `9` is the current definition of `hr.attendance_day` and supersedes `4` and `5`.
 It was applied to production on 2026-08-14 but only captured into this repo on
@@ -50,7 +52,7 @@ Then apply the access model, which is a separate concern and predates these:
 
 ## Re-running
 
-All eight are idempotent — `create table if not exists`, `create or replace view`,
+All fourteen are idempotent — `create table if not exists`, `create or replace view`,
 `add column if not exists`, guarded `do $$` blocks for constraints, and
 `on conflict do nothing` for the seed. Re-running is safe.
 

@@ -1,19 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
+// ============================================================
+// AssessmentResults — HR's view of both walk-in papers.
+//
+// LEVEL 1 (paper_kind 'L1') is the general first-level test every candidate
+// sits, at /test.html. LEVEL 2 ('ROLE') is the position-specific paper at
+// /test2.html — thirteen papers, one per position in §2.2, each with its own
+// sections and its own mark count.
+//
+// The panel never holds an answer key and never re-marks anything. It renders
+// `review`, which the edge function snapshots onto the row at submit, and it
+// takes the section names from the row's own `section_meta`. That is what lets
+// one table render fourteen different papers, including papers that have since
+// been superseded.
+// ============================================================
+
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  fetchAttempts, fetchAttempt, unlockRetake, saveNotes,
-  BANDS, TOTAL_MARKS, marksFor,
+  fetchAttempts, fetchAttempt, fetchAttemptedPositions, unlockRetake, saveNotes,
+  BANDS, marksFor, sectionsFor, sectionKey,
 } from "../../services/assessmentService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
-// Mirrors SECTIONS in supabase/functions/_shared/assessment-bank.ts (v5).
-// Section E is unused on v5; older v3/v4 attempts that have it are still shown
-// in full by the review modal, which reads the attempt's own stored paper.
-const SECTION_META = [
-  { key: "score_section_a", id: "A", name: "Attitude & Ownership", count: 4 },
-  { key: "score_section_b", id: "B", name: "Communication & Teamwork", count: 4 },
-  { key: "score_section_c", id: "C", name: "Reliability & Time", count: 4 },
-  { key: "score_section_d", id: "D", name: "Problem Solving", count: 3 },
-];
+// Column headers are always A–D, because both papers have four scored sections
+// and the names differ per paper. The names appear in the review modal, which
+// reads them off the row. Section E exists only on v3/v4 level-1 attempts and
+// is rendered by the modal, not given a table column.
+const SECTION_IDS = ["A", "B", "C", "D"];
 
 function fmtDT(iso) {
   if (!iso) return "—";
@@ -88,18 +99,28 @@ function ReviewModal({ attemptId, onClose, onChanged }) {
               {row.auto_submitted && <span style={{ marginLeft: 8, color: "#b45309", fontWeight: 700 }}>· auto-submitted on time-up</span>}
             </div>
 
+            {row.paper_kind === "ROLE" && row.position_applied && (
+              <div style={{ fontSize: 13 }}>
+                <span style={{ fontSize: 11, color: "#8a7e72", textTransform: "uppercase", letterSpacing: "0.5px" }}>Position applied for</span>
+                <div style={{ fontWeight: 700 }}>{row.position_applied}</div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontFamily: "'Fraunces',serif", fontSize: 34, fontWeight: 700, lineHeight: 1 }}>
-                  {row.score_total ?? "—"}<span style={{ fontSize: 16, color: "#8a7e72" }}> / {Array.isArray(row.review) ? row.review.length : marksFor(row.assessment_id)}</span>
+                  {row.score_total ?? "—"}<span style={{ fontSize: 16, color: "#8a7e72" }}> / {marksFor(row)}</span>
                 </div>
                 <div style={{ marginTop: 6 }}><BandPill band={row.band} /></div>
               </div>
+              {/* Section names come off the row, so a role paper shows its own
+                  sections and a superseded level-1 attempt still shows the ones
+                  it was actually sat under. */}
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-                {SECTION_META.map((s) => (
+                {sectionsFor(row).map((s) => (
                   <div key={s.id}>
                     <div style={{ fontSize: 11, color: "#8a7e72", textTransform: "uppercase", letterSpacing: "0.5px" }}>{s.name}</div>
-                    <div style={{ fontSize: 15, fontWeight: 700 }}>{row[s.key] ?? "—"} / {s.count}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{row[sectionKey(s.id)] ?? "—"} / {s.count}</div>
                   </div>
                 ))}
               </div>
@@ -184,16 +205,32 @@ export default function AssessmentResults() {
   const [search, setSearch]     = useState("");
   const [sort, setSort]         = useState("score");
   const [openId, setOpenId]     = useState(null);
+  // The two papers never share a view: different marks, different sections,
+  // different meaning. Level 1 is the default because every candidate sits it.
+  const [paperKind, setPaperKind] = useState("L1");
+  const [position, setPosition]   = useState("");
+  const [positions, setPositions] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setRows(await fetchAttempts({ dateFrom, dateTo, band: band || undefined, search, sort }));
+      setRows(await fetchAttempts({
+        dateFrom, dateTo, band: band || undefined, search, sort,
+        paperKind,
+        position: paperKind === "ROLE" ? (position || undefined) : undefined,
+      }));
     } catch (e) { showToast(e.message || "Failed to load assessment attempts."); }
     finally { setLoading(false); }
-  }, [dateFrom, dateTo, band, search, sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, band, search, sort, paperKind, position]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (paperKind !== "ROLE") return;
+    fetchAttemptedPositions().then(setPositions).catch(() => {});
+  }, [paperKind]);
+
+  const isRole = paperKind === "ROLE";
 
   const submitted  = rows.filter((r) => r.status === "submitted");
   const inProgress = rows.filter((r) => r.status === "in_progress").length;
@@ -201,21 +238,34 @@ export default function AssessmentResults() {
     ? (submitted.reduce((s, r) => s + (r.score_total || 0), 0) / submitted.length).toFixed(1)
     : "—";
   const strong = submitted.filter((r) => r.band === "STRONG").length;
-  const strongCut = 13; // v5: 13+/15. See bandFor() in assessment-bank.ts.
+  // v5: 13+/15. Role papers: 9+/12. See bandFor() / roleBandFor() in the banks.
+  const strongCut = isRole ? 9 : 13;
+
+  // Section names differ per role paper, so the CSV header is built from the
+  // rows on screen. With one position selected they are all the same paper and
+  // the header is exact; across positions it falls back to A–D, and every row
+  // still carries its own paper id so the export stays unambiguous.
+  const csvSections = useMemo(() => {
+    const first = rows.find((r) => Array.isArray(r.section_meta) && r.section_meta.length);
+    return first ? first.section_meta : sectionsFor(null);
+  }, [rows]);
 
   const exportCSV = () => {
     const rowsOut = [[
-      "Email", "Name", "Paper", "Attempt", "Score", "Out Of",
-      ...SECTION_META.map((s) => `${s.name}/${s.count}`),
+      "Email", "Name", "Paper", "Level", "Position", "Attempt", "Score", "Out Of",
+      ...csvSections.map((s) => `${s.name}/${s.count}`),
       "Band", "Status", "Started", "Submitted",
       "Duration (s)", "Auto Submitted", "Notes",
     ]];
     for (const r of rows) {
       rowsOut.push([
         r.email, (r.full_name || "").replace(/,/g, ";"),
-        r.assessment_id || "", r.attempt_no,
-        r.score_total ?? "", TOTAL_MARKS,
-        ...SECTION_META.map((s) => r[s.key] ?? ""),
+        r.assessment_id || "",
+        r.paper_kind === "ROLE" ? "Level 2" : "Level 1",
+        (r.position_applied || "").replace(/,/g, ";"),
+        r.attempt_no,
+        r.score_total ?? "", marksFor(r),
+        ...SECTION_IDS.map((id) => r[sectionKey(id)] ?? ""),
         r.band || "", r.status, r.started_at || "", r.submitted_at || "",
         r.duration_seconds ?? "", r.auto_submitted ? "yes" : "no",
         (r.notes || "").replace(/,/g, ";"),
@@ -224,7 +274,7 @@ export default function AssessmentResults() {
     const csv = rowsOut.map((r) => r.join(",")).join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `assessment_${dateFrom}_${dateTo}.csv`;
+    a.download = `assessment_${isRole ? "level2" : "level1"}_${dateFrom}_${dateTo}.csv`;
     a.click();
   };
 
@@ -232,9 +282,20 @@ export default function AssessmentResults() {
     <div className="fade-in">
       <div className="page-title">Assessment Results</div>
       <div className="page-sub">
-        Walk-in first-level assessment · 20 marks · candidates identify themselves by email at{" "}
-        <code style={{ fontSize: 12 }}>/test.html</code>. Sorted strongest first so the panel sees
-        them first — this is a queue order, never a filter.
+        {isRole ? (
+          <>
+            Second-level <b>role assessment</b> · 12 marks · one paper per position, at{" "}
+            <code style={{ fontSize: 12 }}>/test2.html</code>. Candidates identify themselves by
+            email and pick the position they applied for. Compare candidates within a position,
+            not across positions — the papers are different.
+          </>
+        ) : (
+          <>
+            Walk-in <b>first-level assessment</b> · 15 marks · candidates identify themselves by
+            email at <code style={{ fontSize: 12 }}>/test.html</code>.
+          </>
+        )}{" "}
+        Sorted strongest first so the panel sees them first — this is a queue order, never a filter.
       </div>
 
       <div className="stat-row" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 20 }}>
@@ -245,6 +306,26 @@ export default function AssessmentResults() {
       </div>
 
       <div className="card" style={{ marginBottom: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div className="form-field">
+          <label className="form-label">Test</label>
+          <select
+            className="form-input"
+            value={paperKind}
+            onChange={(e) => { setPaperKind(e.target.value); setPosition(""); }}
+          >
+            <option value="L1">Level 1 — General</option>
+            <option value="ROLE">Level 2 — Role</option>
+          </select>
+        </div>
+        {isRole && (
+          <div className="form-field" style={{ minWidth: 190 }}>
+            <label className="form-label">Position</label>
+            <select className="form-input" value={position} onChange={(e) => setPosition(e.target.value)}>
+              <option value="">All positions</option>
+              {positions.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        )}
         <div className="form-field" style={{ minWidth: 180, flex: 1 }}>
           <label className="form-label">Search</label>
           <input className="form-input" placeholder="Email or name…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -283,7 +364,7 @@ export default function AssessmentResults() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 860 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #e8e2d9", background: "#faf8f5" }}>
-                {["Candidate", "Score", ...SECTION_META.map((s) => `${s.id} / ${s.count}`), "Band", "Submitted", "Took", ""].map((h, i) => (
+                {["Candidate", ...(isRole ? ["Position"] : []), "Score", ...SECTION_IDS, "Band", "Submitted", "Took", ""].map((h, i) => (
                   <th key={i} style={{ padding: "12px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "#8a7e72", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -301,10 +382,15 @@ export default function AssessmentResults() {
                       <span style={{ fontSize: 10, fontWeight: 700, color: "#b45309" }}>attempt {r.attempt_no}</span>
                     )}
                   </td>
+                  {isRole && (
+                    <td style={{ padding: "11px 14px", fontSize: 12, color: "#5a5048" }}>
+                      {r.position_applied || "—"}
+                    </td>
+                  )}
                   <td style={{ padding: "11px 14px", whiteSpace: "nowrap" }}>
                     {r.status === "submitted" ? (
                       <span style={{ fontFamily: "'Fraunces',serif", fontSize: 17, fontWeight: 700 }}>
-                        {r.score_total}<span style={{ fontSize: 12, color: "#8a7e72" }}> / {marksFor(r.assessment_id)}</span>
+                        {r.score_total}<span style={{ fontSize: 12, color: "#8a7e72" }}> / {marksFor(r)}</span>
                       </span>
                     ) : (
                       <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: "rgba(245,158,11,0.12)", color: "#b45309" }}>
@@ -312,8 +398,8 @@ export default function AssessmentResults() {
                       </span>
                     )}
                   </td>
-                  {SECTION_META.map((s) => (
-                    <td key={s.id} style={{ padding: "11px 14px", fontSize: 13, color: "#5a5048" }}>{r[s.key] ?? "—"}</td>
+                  {SECTION_IDS.map((id) => (
+                    <td key={id} style={{ padding: "11px 14px", fontSize: 13, color: "#5a5048" }}>{r[sectionKey(id)] ?? "—"}</td>
                   ))}
                   <td style={{ padding: "11px 14px" }}><BandPill band={r.band} /></td>
                   <td style={{ padding: "11px 14px", fontSize: 12, color: "#5a5048", whiteSpace: "nowrap" }}>

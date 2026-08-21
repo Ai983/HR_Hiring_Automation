@@ -9,7 +9,7 @@
 import { supabase } from "../supabaseClient.js";
 
 // Kept in step with supabase/functions/_shared/assessment-bank.ts. TOTAL_MARKS
-// is only used for the "n / 25" labels; the stored scores are authoritative and
+// is only used for the "n / 15" labels; the stored scores are authoritative and
 // a v2 attempt (20 marks) still renders correctly from its own `review`.
 export const ASSESSMENT_ID = "HAG-WALKIN-L1-v5";
 export const TOTAL_MARKS = 15;
@@ -17,13 +17,62 @@ export const TOTAL_MARKS = 15;
 // Attempts are never migrated between versions (§7.3), so the panel will show
 // v2 and v3 rows side by side for a while. Score out of the paper the candidate
 // actually sat, not out of whatever the current paper happens to be.
+//
+// The level-2 role papers are all 12 marks and are not listed individually —
+// there are thirteen of them, each independently versionable, and listing them
+// here would be one more place to forget to update. `review.length` on the row
+// is the authoritative count and is what the panel prefers; ROLE_MARKS is only
+// the fallback for a row with no marked paper yet.
 const PAPER_MARKS = {
   "HAG-WALKIN-L1-v2": 20,
   "HAG-WALKIN-L1-v3": 25,
   "HAG-WALKIN-L1-v4": 20,
   "HAG-WALKIN-L1-v5": 15,
 };
-export const marksFor = (assessmentId) => PAPER_MARKS[assessmentId] ?? TOTAL_MARKS;
+export const ROLE_MARKS = 12;
+
+/**
+ * Marks the given attempt was out of.
+ *
+ * Prefers the row's own stored paper — `review.length` for a submitted attempt,
+ * then the section counts in `section_meta` — and only falls back to the table
+ * above. That order is what keeps an old attempt readable after its paper has
+ * been bumped, without the panel having to know anything about the bank.
+ */
+export function marksFor(assessmentIdOrRow, maybeRow) {
+  const row = typeof assessmentIdOrRow === "object" ? assessmentIdOrRow : maybeRow;
+  const assessmentId = typeof assessmentIdOrRow === "object"
+    ? assessmentIdOrRow?.assessment_id
+    : assessmentIdOrRow;
+
+  if (Array.isArray(row?.review) && row.review.length) return row.review.length;
+  if (Array.isArray(row?.section_meta) && row.section_meta.length) {
+    return row.section_meta.reduce((n, s) => n + (s.count || 0), 0);
+  }
+  if (PAPER_MARKS[assessmentId]) return PAPER_MARKS[assessmentId];
+  if (row?.paper_kind === "ROLE" || String(assessmentId || "").startsWith("HAG-ROLE-")) {
+    return ROLE_MARKS;
+  }
+  return TOTAL_MARKS;
+}
+
+// The section columns the panel renders. Level 1 has a fixed set; every role
+// paper has its own, so a row's `section_meta` wins where it exists.
+export const L1_SECTIONS = [
+  { id: "A", name: "Attitude & Ownership", count: 4 },
+  { id: "B", name: "Communication & Teamwork", count: 4 },
+  { id: "C", name: "Reliability & Time", count: 4 },
+  { id: "D", name: "Problem Solving", count: 3 },
+];
+
+export const SECTION_COLUMNS = ["A", "B", "C", "D", "E"];
+export const sectionKey = (id) => `score_section_${id.toLowerCase()}`;
+
+/** The sections of the paper this row actually sat. */
+export function sectionsFor(row) {
+  if (Array.isArray(row?.section_meta) && row.section_meta.length) return row.section_meta;
+  return L1_SECTIONS;
+}
 
 export const BANDS = {
   STRONG:    { label: "Strong",    bg: "rgba(34,197,94,0.12)",  color: "#16a34a" },
@@ -41,16 +90,25 @@ export const BANDS = {
  * filter here: an experienced site supervisor may score 8/20 and still be the
  * right hire.
  */
-export async function fetchAttempts({ dateFrom, dateTo, band, search, sort = "score" } = {}) {
+export async function fetchAttempts({
+  dateFrom, dateTo, band, search, sort = "score", paperKind, position,
+} = {}) {
   if (!supabase) return [];
   let q = supabase
     .from("assessment_attempts")
-    .select("id, assessment_id, email, full_name, attempt_no, applicant_id, started_at, submitted_at, duration_seconds, auto_submitted, score_total, score_section_a, score_section_b, score_section_c, score_section_d, score_section_e, band, status, retake_unlocked, unlocked_by, notes")
+    .select("id, assessment_id, paper_kind, position_applied, section_meta, email, full_name, attempt_no, applicant_id, started_at, submitted_at, duration_seconds, auto_submitted, score_total, score_section_a, score_section_b, score_section_c, score_section_d, score_section_e, band, status, retake_unlocked, unlocked_by, notes")
     .limit(1000);
 
   if (dateFrom) q = q.gte("started_at", new Date(dateFrom + "T00:00:00").toISOString());
   if (dateTo)   q = q.lte("started_at", new Date(dateTo   + "T23:59:59").toISOString());
   if (band)     q = q.eq("band", band);
+  // Level 1 and level 2 are different papers with different marks and different
+  // sections, so mixing them in one table is only ever confusing. The panel
+  // always has one or the other selected.
+  if (paperKind) q = q.eq("paper_kind", paperKind);
+  // A position filter is a way of comparing the candidates for ONE role against
+  // each other. It is still a sort within that group, never a gate (§6.3).
+  if (position)  q = q.eq("position_applied", position);
   if (search) {
     const s = search.trim().replace(/[,%]/g, "");
     if (s) q = q.or(`email.ilike.%${s}%,full_name.ilike.%${s}%`);
@@ -63,6 +121,25 @@ export async function fetchAttempts({ dateFrom, dateTo, band, search, sort = "sc
   const { data, error } = await q;
   if (error) throw new Error(error.message || "Could not load attempts.");
   return data || [];
+}
+
+/**
+ * The positions that actually have level-2 attempts, for the filter dropdown.
+ *
+ * Derived from the rows rather than from a hardcoded copy of §2.2, so the filter
+ * only ever offers positions somebody has actually sat — an empty dropdown entry
+ * that returns nothing reads as a bug to whoever is running the desk.
+ */
+export async function fetchAttemptedPositions() {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("assessment_attempts")
+    .select("position_applied")
+    .eq("paper_kind", "ROLE")
+    .not("position_applied", "is", null)
+    .limit(2000);
+  if (error) return [];
+  return [...new Set((data || []).map((r) => r.position_applied))].sort();
 }
 
 /** One attempt with its marked paper, for the review modal. */

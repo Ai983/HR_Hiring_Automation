@@ -93,6 +93,18 @@ button,.as-option,.as-cell{
 }
 .as-input:focus{outline:none;border-color:#c97a2a;background:#fff;}
 
+/* The level-2 position picker. appearance:none so the arrow does not differ
+   wildly between the Android browsers in the hall; min-height matches the text
+   inputs so the three fields read as one stack. The 16px font size on .as-input
+   is what stops iOS auto-zooming on focus — do not reduce it here. */
+.as-select{
+  appearance:none;-webkit-appearance:none;
+  min-height:48px;padding-right:38px;cursor:pointer;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238a7e72' d='M1 1l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 14px center;
+}
+
 .as-error{
   background:#fdecec;border:1px solid #f3c9c9;border-radius:10px;
   padding:10px 12px;font-size:13px;color:#a3352f;line-height:1.45;

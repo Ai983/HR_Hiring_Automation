@@ -47,17 +47,38 @@ async function call(payload, { retries = 0 } = {}) {
   );
 }
 
-/** Start a new attempt, or resume the one already in progress for this email. */
-export function startAttempt({ email, fullName }) {
+/**
+ * Start a new attempt, or resume the one already in progress for this email.
+ *
+ * `kind` selects the paper: "L1" (default) is the general first-level test that
+ * every candidate sits; "ROLE" is the second-level paper, which additionally
+ * needs the position applied for. The server decides which questions that maps
+ * to — this file never knows.
+ */
+export function startAttempt({ email, fullName, kind = "L1", position }) {
   return call(
     {
       action: "start",
+      kind,
+      position: position || undefined,
       email,
       full_name: fullName,
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
     },
     { retries: 2 }
   );
+}
+
+/**
+ * The positions a level-2 paper exists for, for the dropdown.
+ *
+ * Fetched rather than hardcoded so the option list and the papers cannot drift
+ * apart — a position offered here that the server has no paper for is a
+ * candidate who cannot start. One retry only: the start screen has a fallback
+ * list, and a candidate must not sit watching a spinner.
+ */
+export function fetchPositions() {
+  return call({ action: "positions" }, { retries: 1 });
 }
 
 /** Submit for marking. `answers` is { questionNumber: displayedOptionIndex }. */

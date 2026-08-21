@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "assessment:pdf": "node --experimental-strip-types scripts/make-assessment-pdf.mjs"
+    "assessment:pdf": "node --experimental-strip-types scripts/make-assessment-pdf.mjs",
+    "assessment:verify-roles": "node scripts/verify-role-bank.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

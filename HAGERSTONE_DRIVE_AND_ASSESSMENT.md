@@ -159,16 +159,25 @@ candidates to bring a printed CV to the venue.
 1. ARRIVAL      → Candidate signs the register, states position applied for
 2. VERIFY       → Check photo ID; confirm they appear in the response Sheet
                   (walk-ins without prior registration are allowed — register on the spot)
-3. ASSESSMENT   → Send them to /test.html on their phone. They enter their email
-                  and name, and sit the 15-question paper (§5.4). 20 min. Invigilated.
-                  COLLECT PHONES — the paper is not AI-proof (§5.4).
+3. ASSESSMENT   → LEVEL 1: send them to /test.html on their phone. They enter
+   (level 1)      their email and name, and sit the 15-question paper (§5.4).
+                  20 min. Invigilated. COLLECT PHONES — not AI-proof (§5.4).
                   If the Wi-Fi is down, issue the printed 13-question paper (§5.0).
-4. MARK         → Online: marked automatically, score on screen at submit, and in
-                  the Assessment panel. Paper: evaluator marks against the key.
-5. ROUTE        → Score band (§6) decides queue priority, NOT accept/reject
-6. INTERVIEW    → Technical panel by department
-7. OUTCOME      → Recorded against the candidate in the hiring system
+4. ASSESSMENT   → LEVEL 2: same phone, /test2.html. Same email and name, plus the
+   (level 2)      POSITION they applied for — that is what selects their paper.
+                  12 questions on their own role, 15 min (§7.7). Same invigilation.
+                  No printed fallback exists for level 2: if the Wi-Fi is down,
+                  skip it and run the technical interview as before.
+5. MARK         → Online: both papers marked automatically, score on screen at
+                  submit, and in the Assessment panel. Paper: marked against the key.
+6. ROUTE        → Score bands (§6) decide queue priority, NOT accept/reject
+7. INTERVIEW    → Technical panel by department
+8. OUTCOME      → Recorded against the candidate in the hiring system
 ```
+
+**Level 2 is optional on a busy day.** It is 15 more minutes per candidate on a
+queue that §7.5 already flags as time-constrained. If the hall backs up, run more
+devices; if that is not enough, level 1 alone still produces the queue order.
 
 **Assessment is a queue-prioritisation tool, not a gate.** See §6.3.
 
@@ -579,6 +588,12 @@ sit it. If department-level technical screening is wanted, build it as a
 **separate second-level assessment** keyed to `department`, taken after the
 first-level pass.
 
+> **Built, 21 August 2026 — see §7.7.** It is keyed to **position** rather than
+> department, because the four departments each span roles that share almost no
+> technical ground: Procurement, Sales Manager, Sales Executive and Documentation
+> Controller are one department and four different jobs. This paragraph stands as
+> written for the level-1 paper — level 1 must stay general.
+
 ### 7.6 Deploying it
 
 ```
@@ -592,6 +607,71 @@ No "Verify JWT" toggle is needed on the function: the page calls it with the
 project anon key in the `Authorization` header, which is a valid project JWT —
 the same call shape as `screen-resume`.
 
+### 7.7 The second-level, position-specific assessment
+
+Built 21 August 2026, as §7.5 reserved. **A second paper, sat after level 1**,
+whose questions are chosen by the position the candidate applied for.
+
+| | Level 1 | Level 2 |
+|---|---|---|
+| URL | `/test.html` | `/test2.html` |
+| Start screen asks | email · name | email · name · **position applied for** |
+| Papers | one, sat by all 13 positions | **13**, one per position (§2.2) |
+| Content | general workplace behaviour | role-specific, medium difficulty |
+| Length | 15 Q · 15 marks · 20 min | 12 Q · 12 marks · 15 min |
+| Sections | 4, fixed | 4, **different per paper** |
+| Bands | 13 / 9 / 6 | 9 / 6 / 4 |
+| Paper id | `HAG-WALKIN-L1-v5` | `HAG-ROLE-<POSITION>-v1` |
+| Bank | `_shared/assessment-bank.ts` | `_shared/role-assessment-bank.ts` |
+
+**Why position and not department.** §7.5 proposed keying it to `department`.
+Four departments cover thirteen jobs with almost no shared technical ground — a
+Documentation Controller and a Sales Executive are the same department. Keyed to
+position, every candidate gets questions about the work they applied to do.
+
+**Why a separate URL rather than a choice on one screen.** The desk hands out one
+link or the other. A candidate on a borrowed phone in a queue should never have
+to decide which test they are supposed to be sitting.
+
+**Everything else is deliberately identical** and shares the same machinery: same
+table, same edge function, same candidate component (a `kind` prop), same HR
+panel, same anonymous-browser security shape (§7.1), same server-issued token,
+same server-side timer and marking, same one-attempt-and-HR-unlock rule — which
+applies **per paper**, so sitting level 1 does not block level 2.
+
+**Bands are cut lower** (9–12 STRONG · 6–8 AVERAGE · 4–5 WEAK · 0–3 BELOW_BAR)
+because these test exposure, not judgement: a capable candidate can legitimately
+miss three of twelve. Re-cut them against real data after the drive.
+
+**§6.3 applies with extra force.** A low level-2 score may mean nothing more than
+that the candidate applied for the position next to the one they have actually
+spent ten years doing. It is a queue order. It must never auto-reject, and the
+panel has no minimum-score filter for either paper.
+
+**The answer key is engineering judgement, not signed-off Hagerstone policy** —
+and more so than level 1, because these encode how a specific role is expected
+to be performed. See §9.3; none of it has HR or department-head sign-off as of
+21 Aug 2026.
+
+**HR sees both** in Sidebar → Onboarding → Assessment, behind a **Test** selector
+(Level 1 / Level 2) plus a **Position** filter on level 2. Per-question review,
+CSV export and the retake unlock all work the same for both.
+
+Engineering detail — invariants, versioning, the `submit`-refuses-to-mis-mark
+rule, and `npm run assessment:verify-roles` — is in `CLAUDE.md`.
+
+### 7.8 Deploying level 2
+
+```
+1. Apply supabase/migrations/20260821090000_hr_assessment_role_level2.sql
+2. supabase functions deploy assessment   (the shared function; level 1 unaffected)
+3. Deploy the app. The candidate page is /test2.html
+```
+
+Additive throughout: every column is nullable or defaulted, an absent `kind` on
+a `start` call still means level 1, and an older cached candidate page keeps
+working unchanged.
+
 ---
 
 ## 8. SUPPORTING ASSETS
@@ -599,8 +679,10 @@ the same call shape as `screen-resume`.
 | Asset | File / Location | Notes |
 |-------|-----------------|-------|
 | Carousel posters (14) | `Drive_22Aug_Card01..14_*.png` | 2160×2160, 1:1 |
-| Online assessment | `/test.html` on the hiring app | v5 · 15 Q · live · see §7 |
-| Question bank + key | `supabase/functions/_shared/assessment-bank.ts` | **Server-only. Never publish.** |
+| Online assessment (level 1) | `/test.html` on the hiring app | v5 · 15 Q · live · see §7 |
+| Online assessment (level 2) | `/test2.html` on the hiring app | 13 papers · 12 Q each · see §7.7 |
+| Question bank + key (level 1) | `supabase/functions/_shared/assessment-bank.ts` | **Server-only. Never publish.** |
+| Question bank + key (level 2) | `supabase/functions/_shared/role-assessment-bank.ts` | **Server-only. Never publish.** |
 | Assessment paper (v1) | `Hagerstone_Walkin_Assessment_13Q.pdf` | 3 pages · Wi-Fi-failure fallback |
 | Indeed listing | `Hagerstone_Indeed_Job_Posting.docx` | Ready to paste |
 | WhatsApp messaging spec | `WHATSAPP_DRIVE_MESSAGING_SPEC.md` | M1–M4 build spec |
@@ -639,7 +721,7 @@ confirmed.
 
 ### 9.3 Content requiring HR sign-off
 
-Two pieces of content were drafted from general industry knowledge, **not** from
+Three pieces of content were drafted from general industry knowledge, **not** from
 Hagerstone job descriptions:
 
 1. **The 52 responsibility bullet points** on the 13 role posters (4 per role).
@@ -657,7 +739,32 @@ Hagerstone job descriptions:
    Q13 (GRN and rejection practice). Fifteen minutes with someone who runs sites
    and someone who runs procurement covers all five.
 
-Neither has been reviewed by HR or department heads. Two specific items to verify:
+3. **The 156 level-2 answers** (§7.7) — 13 papers × 12 questions in
+   `_shared/role-assessment-bank.ts`. This is now the **largest** unsigned-off
+   block of content in the project and the most exposed, because every answer is
+   a claim about how a named Hagerstone role is expected to work. The ones most
+   likely to be contested, by paper:
+
+   - **Project Manager** Q4 (written variation before extra work starts) and
+     Q12 (partial handover against a snag list) — both describe your commercial
+     process, not a general truth.
+   - **Site Engineer** Q12 and **Site Supervisor** Q12 — whose instruction the
+     team may act on, and what happens when the reporting line is absent.
+   - **MEP Engineer** Q9 — holding a concrete pour for missing sleeves. Correct
+     engineering, but it is a real cost and someone senior has to own the call.
+   - **Procurement** Q9 (declining and reporting a vendor gift) and Q8 (advance
+     payment) — these are conduct and treasury policy, not judgement.
+   - **Documentation Controller** Q10 — refusing to backdate a transmittal, and
+     escalating if pressed.
+   - **Sales Manager** Q7 / **Sales Executive** Q11 — discounting authority and
+     what happens when an executive quotes below it.
+
+   Ninety minutes with a project head, a procurement head and a sales head covers
+   all of them. Until then they are defensible engineering judgement and nothing
+   more, and a candidate who argues one at interview may simply be right.
+
+None of the three has been reviewed by HR or department heads. Two further
+specific items to verify:
 - Civil Engineer poster states *"Ensure quality as per IS standards"* — confirm
   Hagerstone works to IS codes on these projects.
 - Sales Executive poster states *"Maintain CRM and pipeline records"* — confirm a CRM

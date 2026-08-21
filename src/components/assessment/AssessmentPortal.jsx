@@ -1,9 +1,20 @@
 // ============================================================
-// AssessmentPortal — the page a walk-in candidate sits the test on.
+// AssessmentPortal — the page a walk-in candidate sits a test on.
 //
 // No login, no password, no Supabase session. The candidate types an email and
 // a name; the email is what separates one person's answers and score from
 // another's. Everything server-side goes through assessmentApi.js.
+//
+// ONE COMPONENT, TWO PAPERS. The `kind` prop selects which:
+//   "L1"   → /test.html  — the general first-level paper. Email + name.
+//   "ROLE" → /test2.html — the second-level paper, keyed to the position the
+//            candidate applied for. Email + name + POSITION, because the
+//            position is what decides which set of questions they are served.
+// The two are separate URLs rather than a choice on one screen: the desk hands
+// out one link or the other, so a nervous candidate on a borrowed phone never
+// has to decide which test they are supposed to be taking. Everything below
+// this line is identical for both — the server tells the page how many
+// questions, how long, and what the sections are called.
 //
 // Built for a low-end Android on venue Wi-Fi (§7.2 of
 // HAGERSTONE_DRIVE_AND_ASSESSMENT.md): one question per screen, big tap
@@ -12,19 +23,40 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { startAttempt, submitAttempt } from "../../services/assessmentApi.js";
+import { startAttempt, submitAttempt, fetchPositions } from "../../services/assessmentApi.js";
 import "./AssessmentPortal.css";
 
-// Bumped with the paper version so a half-finished v2 sheet cached on a phone
-// can never be restored on top of the v3 paper.
-const SESSION_KEY = "hag_assessment_session_v5";
-const ANSWERS_KEY = "hag_assessment_answers_v5";
+// Suffixed with the paper version so a half-finished older sheet cached on a
+// phone can never be restored on top of a newer paper — and suffixed with the
+// KIND so a phone that has just sat level 1 cannot restore that sheet onto the
+// level-2 paper. Two candidates share a phone at this drive; two papers on one
+// phone is the ordinary case, not the edge case.
+const STORAGE_KEYS = {
+  L1:   { session: "hag_assessment_session_v5",      answers: "hag_assessment_answers_v5" },
+  ROLE: { session: "hag_assessment_role_session_v1", answers: "hag_assessment_role_answers_v1" },
+};
 
 // Shown on the start screen, before the server has told us anything. Keep in
-// step with TOTAL_QUESTIONS / DURATION_MINUTES in assessment-bank.ts — the
-// timer and the marking follow the server, this is only the briefing.
-const BRIEF_QUESTIONS = 15;
-const BRIEF_MINUTES = 20;
+// step with the banks — TOTAL_QUESTIONS / DURATION_MINUTES in
+// assessment-bank.ts, and ROLE_TOTAL_QUESTIONS / ROLE_DURATION_MINUTES in
+// role-assessment-bank.ts. The timer and the marking follow the server; this is
+// only the briefing.
+const BRIEF = {
+  L1:   { questions: 15, minutes: 20, title: "First-Level Assessment" },
+  ROLE: { questions: 12, minutes: 15, title: "Role Assessment" },
+};
+
+// Used only if the positions call fails on venue Wi-Fi — the candidate still
+// gets a working dropdown. The server validates whatever is picked and returns
+// a clear error if it does not match a paper, so a drift here cannot serve
+// somebody the wrong questions. Exact spelling per §2.2, cedilla included.
+const FALLBACK_POSITIONS = [
+  "Project Manager", "Site Engineer", "Site Supervisor", "Civil Engineer",
+  "MEP Engineer", "Interior Designer", "Architect", "Façade Factory Manager",
+  "Factory Operations", "Procurement", "Sales Manager", "Sales Executive",
+  "Documentation Controller",
+];
+
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 const readJson = (key) => {
@@ -41,10 +73,10 @@ const writeJson = (key, value) => {
     /* private browsing — the network round-trip is still the source of truth */
   }
 };
-const clearStored = () => {
+const clearStored = (keys) => {
   try {
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(ANSWERS_KEY);
+    localStorage.removeItem(keys.session);
+    localStorage.removeItem(keys.answers);
   } catch {
     /* ignore */
   }
@@ -58,12 +90,18 @@ function formatClock(ms) {
   return `${m}:${s}`;
 }
 
-export default function AssessmentPortal() {
+export default function AssessmentPortal({ kind = "L1" }) {
+  const isRole = kind === "ROLE";
+  const keys = STORAGE_KEYS[isRole ? "ROLE" : "L1"];
+  const brief = BRIEF[isRole ? "ROLE" : "L1"];
+
   // "start" | "test" | "result" | "blocked"
   const [screen, setScreen] = useState("start");
 
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
+  const [position, setPosition] = useState("");
+  const [positions, setPositions] = useState(FALLBACK_POSITIONS);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
 
@@ -90,18 +128,34 @@ export default function AssessmentPortal() {
 
   // ── Restore an interrupted sitting ────────────────────────────────────────
   useEffect(() => {
-    const stored = readJson(SESSION_KEY);
+    const stored = readJson(keys.session);
     if (!stored?.attempt_token || !Array.isArray(stored.questions)) return;
     if (new Date(stored.ends_at).getTime() + 60000 < Date.now()) {
-      clearStored();
+      clearStored(keys);
       return;
     }
     setSession(stored);
-    setAnswers(readJson(ANSWERS_KEY)?.[stored.attempt_token] || {});
+    setAnswers(readJson(keys.answers)?.[stored.attempt_token] || {});
     setEmail(stored.email || "");
     setFullName(stored.full_name || "");
+    setPosition(stored.position || "");
     setScreen("test");
-  }, []);
+  }, [keys.session, keys.answers]);
+
+  // The dropdown comes from the server so it cannot drift from the papers that
+  // actually exist. A failure here is not worth blocking on — FALLBACK_POSITIONS
+  // is already in state and the server validates the pick either way.
+  useEffect(() => {
+    if (!isRole) return;
+    let live = true;
+    fetchPositions()
+      .then((res) => {
+        const list = (res?.positions || []).map((p) => p.position).filter(Boolean);
+        if (live && list.length) setPositions(list);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [isRole]);
 
   // Every screen change and every question change starts at the top. Without
   // this, scrolling to the bottom of a long Section D case and tapping Next
@@ -169,7 +223,7 @@ export default function AssessmentPortal() {
           answers,
         });
         setResult({ ...res, auto });
-        clearStored();
+        clearStored(keys);
         setScreen("result");
       } catch (e) {
         // The answers stay in localStorage. HR can retry from this screen.
@@ -200,10 +254,16 @@ export default function AssessmentPortal() {
       return setError("Please enter a valid email address.");
     }
     if (cleanName.length < 2) return setError("Please enter your full name.");
+    if (isRole && !position) return setError("Please select the position you applied for.");
 
     setStarting(true);
     try {
-      const res = await startAttempt({ email: cleanEmail, fullName: cleanName });
+      const res = await startAttempt({
+        email: cleanEmail,
+        fullName: cleanName,
+        kind,
+        position: isRole ? position : undefined,
+      });
 
       if (res.blocked) {
         setPrevious(res.previous);
@@ -217,15 +277,16 @@ export default function AssessmentPortal() {
         attempt_token: res.attempt_token,
         email: res.email,
         full_name: res.full_name,
+        position: res.position || null,
         ends_at: res.ends_at,
         questions: res.questions,
         sections: res.sections,
         total_questions: res.total_questions,
       };
       setSession(next);
-      writeJson(SESSION_KEY, next);
+      writeJson(keys.session, next);
 
-      const restored = res.resumed ? readJson(ANSWERS_KEY)?.[res.attempt_token] || {} : {};
+      const restored = res.resumed ? readJson(keys.answers)?.[res.attempt_token] || {} : {};
       setAnswers(restored);
       setIndex(0);
       setScreen("test");
@@ -241,7 +302,7 @@ export default function AssessmentPortal() {
       const next = { ...prev, [qn]: optionIndex };
       // Persist on every tap, keyed by token so a stale sheet from an earlier
       // attempt can never bleed into a new one.
-      writeJson(ANSWERS_KEY, { [session.attempt_token]: next });
+      writeJson(keys.answers, { [session.attempt_token]: next });
       return next;
     });
   };
@@ -260,17 +321,23 @@ export default function AssessmentPortal() {
           <div className="as-logo">H</div>
           <div>
             <div className="as-company">Hagerstone International</div>
-            <div className="as-tagline">Walk-in Assessment · 22 August 2026</div>
+            <div className="as-tagline">
+              {isRole ? "Role Assessment" : "Walk-in Assessment"} · 22 August 2026
+            </div>
           </div>
         </div>
 
         <form className="as-card" onSubmit={onStart}>
-          <div className="as-card-title">First-Level Assessment</div>
+          <div className="as-card-title">{brief.title}</div>
 
           <ul className="as-rules">
-            <li><b>{BRIEF_QUESTIONS} questions</b> · 1 mark each</li>
-            <li><b>{BRIEF_MINUTES} minutes.</b> The test submits automatically when time is up.</li>
-            <li>Most questions describe a real work situation. Choose the <b>best</b> action.</li>
+            <li><b>{brief.questions} questions</b> · 1 mark each</li>
+            <li><b>{brief.minutes} minutes.</b> The test submits automatically when time is up.</li>
+            {isRole ? (
+              <li>The questions are for the <b>position you applied for</b>. Select it carefully — it decides your question paper.</li>
+            ) : (
+              <li>Most questions describe a real work situation. Choose the <b>best</b> action.</li>
+            )}
             <li>No negative marking — a wrong answer costs nothing, so attempt all.</li>
             <li>You may go back and change any answer before submitting.</li>
             <li>One attempt only. Your email identifies your paper.</li>
@@ -306,13 +373,35 @@ export default function AssessmentPortal() {
             />
           </div>
 
+          {/* Level 2 only. This is the field that selects the question paper,
+              so it is required and there is no "Other" — a position with no
+              paper is a candidate who cannot start. */}
+          {isRole && (
+            <div className="as-field">
+              <label className="as-label" htmlFor="as-position">Position applied for</label>
+              <select
+                id="as-position"
+                className="as-input as-select"
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+              >
+                <option value="">Select your position…</option>
+                {positions.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {error && <div className="as-error">{error}</div>}
 
           <button className="as-btn as-btn-primary" type="submit" disabled={starting}>
             {starting ? <span className="as-spinner" /> : "Start Test"}
           </button>
           <div className="as-note">
-            Please check your email spelling — it is how your score is matched to you.
+            {isRole
+              ? "Check your email spelling and your position — the email matches your score to you, and the position decides your questions."
+              : "Please check your email spelling — it is how your score is matched to you."}
           </div>
         </form>
       </div>
@@ -328,7 +417,7 @@ export default function AssessmentPortal() {
           <div className="as-card-title">You have already taken this test</div>
           {previous?.score_total != null ? (
             <p className="as-body">
-              Your recorded score is <b>{previous.score_total} / {previous.out_of ?? 20}</b>.
+              Your recorded score is <b>{previous.score_total} / {previous.out_of ?? brief.questions}</b>.
             </p>
           ) : (
             <p className="as-body">An earlier attempt is already on record against this email.</p>
@@ -352,6 +441,9 @@ export default function AssessmentPortal() {
         <div className="as-card as-card-narrow">
           <div className="as-icon">✓</div>
           <div className="as-card-title">Test submitted</div>
+          {isRole && session?.position && (
+            <div className="as-note">{session.position}</div>
+          )}
           {result.auto && <div className="as-note as-note-warn">Time was up — your answers were submitted automatically.</div>}
 
           <div className="as-score">

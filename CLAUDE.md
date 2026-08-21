@@ -26,7 +26,8 @@ there**, or it builds locally and 404s in production.
 |---|---|---|
 | `/` | `index.html` → `src/App.jsx` | HireFlow admin app (Hub login required) |
 | `/attend.html` | `src/attend-main.jsx` | Employee attendance portal (Hub login required) |
-| `/test.html` | `src/test-main.jsx` | **Walk-in candidate assessment — no login at all** |
+| `/test.html` | `src/test-main.jsx` | **Walk-in assessment, level 1 — no login at all** |
+| `/test2.html` | `src/test2-main.jsx` | **Walk-in assessment, level 2 (role-specific) — no login** |
 
 ### Navigation
 
@@ -78,6 +79,21 @@ for `SUPABASE_ACCESS_TOKEN`), so edge functions are currently deployed through t
 MCP `deploy_edge_function` tool. The files in `supabase/functions/` are the source
 of truth — if you deploy by pasting, paste what is in the repo.
 
+> **Get a `SUPABASE_ACCESS_TOKEN` into `.env`.** Two things about the MCP deploy
+> route bite hard, and both disappear with `npx supabase functions deploy assessment`:
+>
+> 1. **It takes file contents inline, so a function is only ever as correct as
+>    what was retyped into the tool call.** For `assessment` that now means
+>    ~130 KB across three files, including 171 answer keys. A single transposed
+>    option mis-marks papers silently. Deploying from disk is byte-exact.
+> 2. **It cannot place a file outside the function directory**, so
+>    `import … from "../_shared/assessment-bank.ts"` fails to bundle. Pasted
+>    deploys have to rewrite those to `"./assessment-bank.ts"` and upload the
+>    banks as siblings — a deployed copy that differs from the repo.
+>
+> Also: `deploy_edge_function` **replaces the whole function**, with no dry run
+> and no confirmation. There is no partial deploy — get the payload right first.
+
 ---
 
 ## The walk-in assessment (built 19 Aug 2026)
@@ -89,15 +105,20 @@ summary.
 
 ### The pieces
 
+There are **two papers**. Level 1 is general and everybody sits it; level 2 is
+role-specific and keyed to the position applied for. They share every piece of
+machinery below except the bank.
+
 | Piece | Path |
 |---|---|
-| Candidate page | `test.html` → `src/components/assessment/AssessmentPortal.jsx` + `.css` |
+| Candidate page | `test.html` / `test2.html` → `src/components/assessment/AssessmentPortal.jsx` + `.css` (one component, `kind` prop) |
 | Candidate API client | `src/services/assessmentApi.js` |
-| Server | `supabase/functions/assessment/index.ts` (actions `start`, `submit`) |
-| **Question bank + answer key** | `supabase/functions/_shared/assessment-bank.ts` |
-| Table | `hr.assessment_attempts` |
+| Server | `supabase/functions/assessment/index.ts` (actions `start`, `submit`, `positions`) |
+| **Level-1 bank + answer key** | `supabase/functions/_shared/assessment-bank.ts` |
+| **Level-2 bank + answer key** | `supabase/functions/_shared/role-assessment-bank.ts` |
+| Table | `hr.assessment_attempts` (both papers; `paper_kind` tells them apart) |
 | HR panel | `src/components/panels/AssessmentResults.jsx` + `src/services/assessmentService.js` |
-| Migrations | `20260819120000_hr_walkin_assessment_attempts.sql`, `20260819160000_hr_assessment_v3_five_sections.sql` |
+| Migrations | `20260819120000_hr_walkin_assessment_attempts.sql`, `20260819160000_hr_assessment_v3_five_sections.sql`, `20260821090000_hr_assessment_role_level2.sql` |
 
 ### The shape, and why
 
@@ -115,11 +136,12 @@ browser anonymous, which forces everything else:
 
 ### Invariants — break these and it fails quietly
 
-- **Never import `assessment-bank.ts` into anything under `src/`.** It holds the
-  answer key. The candidate bundle would ship it to every phone in the hall.
-  `publicQuestions()` strips `answer` and `explanation`; that is the only way
-  question text reaches a browser. Verify after a build:
-  `grep -r "worker-days\|is_correct\|\"answer\"" dist/assets/test-*.js` → nothing.
+- **Never import either bank into anything under `src/`.** They hold the answer
+  keys. The candidate bundle would ship them to every phone in the hall.
+  `publicQuestions()` / `publicRoleQuestions()` strip `answer` and
+  `explanation`; that is the only way question text reaches a browser. Verify
+  after a build:
+  `grep -rlE '"answer"|explanation|is_correct' dist/assets/test-*.js dist/assets/test2-*.js dist/assets/AssessmentPortal-*.js` → nothing.
 - **`presented`** stores the option order each candidate saw (options shuffle per
   candidate; question order is fixed). Without it a stored attempt cannot be
   re-marked.
@@ -186,6 +208,117 @@ Version history — do not reuse any of these ids:
 | v3 | 25 Q online | superseded — situational but too hard, and site-specific |
 | v4 | 20 Q online | superseded — easier, still site-specific |
 | v5 | 15 Q online | **live** — general workplace behaviour |
+
+---
+
+## The level-2 role assessment (built 21 Aug 2026)
+
+The second paper. Same drive, same hall, same phones — sat **after** level 1,
+keyed to the position the candidate applied for. `HAGERSTONE_DRIVE_AND_ASSESSMENT.md`
+§7.5 reserved it in exactly this shape: *"Do not add role-specific technical
+questions to this paper — all 13 positions sit it. If department-level technical
+screening is wanted, build it as a separate second-level assessment."*
+
+**13 papers · 12 questions · 12 marks · 15 minutes · 4 sections of 3.**
+`supabase/functions/_shared/role-assessment-bank.ts`, one paper per position in
+§2.2, ids `HAG-ROLE-<POSITION>-v1`.
+
+| id | position | id | position |
+|---|---|---|---|
+| `…-PROJECT-MANAGER-v1` | Project Manager | `…-ARCHITECT-v1` | Architect |
+| `…-SITE-ENGINEER-v1` | Site Engineer | `…-FACADE-FACTORY-MANAGER-v1` | Façade Factory Manager |
+| `…-SITE-SUPERVISOR-v1` | Site Supervisor | `…-FACTORY-OPERATIONS-v1` | Factory Operations |
+| `…-CIVIL-ENGINEER-v1` | Civil Engineer | `…-PROCUREMENT-v1` | Procurement |
+| `…-MEP-ENGINEER-v1` | MEP Engineer | `…-SALES-MANAGER-v1` | Sales Manager |
+| `…-INTERIOR-DESIGNER-v1` | Interior Designer | `…-SALES-EXECUTIVE-v1` | Sales Executive |
+| | | `…-DOCUMENTATION-CONTROLLER-v1` | Documentation Controller |
+
+Bands are cut **lower** than level 1 — **9–12 STRONG · 6–8 AVERAGE · 4–5 WEAK ·
+0–3 BELOW_BAR** — because these test role exposure, where a capable candidate can
+legitimately miss three of twelve. Re-cut them against real data; never re-cut a
+question that has been sat.
+
+### What is different from level 1, and why
+
+- **The start screen asks for a third thing: the position.** It is a required
+  dropdown and it is what selects the question paper. The list is served by the
+  `positions` action rather than hardcoded in the page, so the options and the
+  papers cannot drift; `FALLBACK_POSITIONS` in `AssessmentPortal.jsx` covers a
+  failed fetch on venue Wi-Fi and the server validates the pick regardless.
+- **Position matching is normalised** (`normalisePosition()`): NFD, case-folded,
+  then everything that is not `a–z0–9` dropped. That is what makes "Façade",
+  "Facade" and a decomposed-cedilla paste from the Google Form all land on the
+  same paper. An unmatched position is a **400 with a clear message**, never a
+  silent fallback to somebody else's paper.
+- **Separate URL, not a mode picker.** `/test2.html`, its own entry in
+  `vite.config.js`. The desk hands out one link or the other so a nervous
+  candidate never has to decide which test they are meant to be sitting.
+- **`localStorage` keys are suffixed by kind as well as version**
+  (`hag_assessment_role_session_v1`). Two papers on one phone is the ordinary
+  case here, not an edge case.
+- **The papers are versioned individually.** Fixing a Site Engineer question
+  bumps `HAG-ROLE-SITE-ENGINEER-v1` → `-v2` and leaves the other twelve alone.
+- **`submit` never trusts the caller for which paper it is.** It reads
+  `paper_kind` / `position_applied` off the attempt row. If the row's
+  `assessment_id` no longer matches the current paper for that position, it
+  **refuses with a 409 rather than mis-marking** — `presented` indexes into the
+  question array the candidate actually sat, so marking against a bumped paper
+  would silently score the wrong answers. HR unlocks a re-sit instead.
+
+### The shared machinery
+
+One table, one edge function, one candidate component, one HR panel.
+`paper_kind` (`'L1'` | `'ROLE'`) is what tells the two apart, and because
+`assessment_id` is part of `assessment_attempts_email_attempt_uniq`, a candidate
+sitting both papers is already two non-colliding rows — the one-attempt block
+and the retake unlock both work **per paper** with no extra code.
+
+- **`section_meta` is written at start**, not at submit. Level 1 has one fixed
+  set of sections; the 13 role papers each have their own, so the panel cannot
+  hardcode them. Same argument as `review`: the row describes its own paper, and
+  stays readable after that paper is superseded.
+- **`marksFor(row)`** prefers `review.length`, then `section_meta`, then the
+  version table. Do not add the 13 role ids to `PAPER_MARKS` — that is one more
+  place to forget.
+- **The score check constraint is now 0–50** (was 25). Re-read the v2→v3 note in
+  `20260819160000`: outgrowing it fails the submit *silently*, for exactly the
+  strongest candidates.
+- **`position_applied`, not `position`.** Bare `position` is a Postgres
+  function-name keyword and reads ambiguously unquoted.
+
+### The answer key is engineering judgement, not Hagerstone policy
+
+This caveat is **stronger here than on level 1**. Level 1's answers are claims
+about general workplace behaviour; these are claims about how Hagerstone expects
+a specific role to be performed — that a variation is raised before extra work
+starts, that a pour is held for missing sleeves, that a gift from a vendor is
+declined and reported. As of 21 Aug 2026 **none of it has HR or department-head
+sign-off**. A candidate can defensibly argue any of it at interview; that is a
+conversation, not a marking bug. Tracked with §9.3.
+
+Also unchanged from level 1: **the paper is not AI-proof and cannot be made so**,
+and **the score is a sort, not a gate** — with an extra edge here, since a low
+role score may only mean the candidate applied for the position next to the one
+they have actually spent ten years doing.
+
+### Verifying a change to the role bank
+
+`scratchpad/verify-role-bank.mjs` (see the git history of this change) does the
+whole of the CLAUDE.md checklist offline:
+
+```bash
+npx esbuild supabase/functions/_shared/role-assessment-bank.ts --format=esm --outfile=<scratch>/rb.mjs
+node <scratch>/verify-role-bank.mjs
+```
+
+It asserts 13 papers, 12 questions each, section counts matching the declared
+sections, answer indices in range, no duplicate option text — and then, 40
+shuffles per paper, that answering **by option text** against the served
+(shuffled) options scores full marks and that answering deliberately wrong scores
+zero. That last one is the check that proves the display→canonical mapping
+survives the shuffle; getting it wrong mis-marks the entire day silently.
+
+---
 
 ### The answer-key PDF
 
