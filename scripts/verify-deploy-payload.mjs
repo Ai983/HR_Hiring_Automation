@@ -67,7 +67,7 @@ if (!eq(P.L1.bands, L1BANK.BANDS)) bad("L1 band table differs from the bank");
 if (!eq(P.ROLE.bands, ROLEBANK.ROLE_BANDS)) bad("role band table differs from the bank");
 if (!eq(P.ROLE.papers, ROLEBANK.ROLE_PAPERS)) bad("role papers differ from role-assessment-bank.ts");
 if (P.ROLE.mins !== ROLEBANK.ROLE_DURATION_MINUTES) bad("role duration differs");
-if (P.ROLE.papers.length !== 13) bad(`role papers: ${P.ROLE.papers.length}, expected 13`);
+if (P.ROLE.papers.length !== 15) bad(`role papers: ${P.ROLE.papers.length}, expected 15`);
 
 // ── 2. Marking must agree with the repo implementation, through the shuffle ──
 const checkPaper = (label, questions, ctx, repo) => {
@@ -142,7 +142,7 @@ for (const [input, want] of [
 for (const junk of ["", "PEB Design Engineer", null, undefined]) {
   if (P.paperForPosition(junk) !== null) bad(`paperForPosition(${JSON.stringify(junk)}) should be null`);
 }
-if (P.POSITION_LIST.length !== 13) bad(`position list has ${P.POSITION_LIST.length} entries`);
+if (P.POSITION_LIST.length !== 15) bad(`position list has ${P.POSITION_LIST.length} entries`);
 if (/answer|explanation/.test(JSON.stringify(P.POSITION_LIST))) bad("position list leaks key material");
 
 // ── 4. Bands ────────────────────────────────────────────────────────────────

@@ -248,7 +248,7 @@ keyed to the position the candidate applied for. `HAGERSTONE_DRIVE_AND_ASSESSMEN
 questions to this paper — all 13 positions sit it. If department-level technical
 screening is wanted, build it as a separate second-level assessment."*
 
-**13 papers · 12 questions · 12 marks · 15 minutes · 4 sections of 3.**
+**15 papers · 12 questions · 12 marks · 15 minutes · 4 sections of 3.**
 `supabase/functions/_shared/role-assessment-bank.ts`, one paper per position in
 §2.2, ids `HAG-ROLE-<POSITION>-v1`.
 
@@ -260,7 +260,15 @@ screening is wanted, build it as a separate second-level assessment."*
 | `…-CIVIL-ENGINEER-v1` | Civil Engineer | `…-PROCUREMENT-v1` | Procurement |
 | `…-MEP-ENGINEER-v1` | MEP Engineer | `…-SALES-MANAGER-v1` | Sales Manager |
 | `…-INTERIOR-DESIGNER-v1` | Interior Designer | `…-SALES-EXECUTIVE-v1` | Sales Executive |
-| | | `…-DOCUMENTATION-CONTROLLER-v1` | Documentation Controller |
+| `…-MARKETING-v1` | Marketing \*| `…-DOCUMENTATION-CONTROLLER-v1` | Documentation Controller |
+| `…-ACCOUNTS-v1` | Accounts \*| | |
+
+\* **Marketing and Accounts are NOT §2.2 drive positions.** They are not on the
+Google Form, not on a poster and not in the Indeed listing, so nobody applied for
+them through the funnel — they were added on request. The `/test2.html` dropdown
+therefore offers two options the drive never advertised. If that is unwanted,
+delete the two papers rather than hiding them in the page: the server decides
+which positions exist, and a page-only change would drift from it.
 
 Bands are cut **lower** than level 1 — **9–12 STRONG · 6–8 AVERAGE · 4–5 WEAK ·
 0–3 BELOW_BAR** — because these test role exposure, where a capable candidate can

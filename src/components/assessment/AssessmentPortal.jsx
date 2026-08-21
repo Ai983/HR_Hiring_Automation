@@ -54,7 +54,7 @@ const FALLBACK_POSITIONS = [
   "Project Manager", "Site Engineer", "Site Supervisor", "Civil Engineer",
   "MEP Engineer", "Interior Designer", "Architect", "Façade Factory Manager",
   "Factory Operations", "Procurement", "Sales Manager", "Sales Executive",
-  "Documentation Controller",
+  "Documentation Controller", "Marketing", "Accounts",
 ];
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];

@@ -2193,8 +2193,349 @@ const DOCUMENTATION_CONTROLLER: RolePaper = {
   ],
 };
 
+// ── Added 21 Aug 2026: two positions that are NOT in §2.2 ────────────────────
+// Marketing and Accounts are not among the 13 drive positions. They are not on
+// the Google Form, not on any poster and not in the Indeed listing, so nobody
+// can have "applied for" them through the funnel — they exist here because the
+// desk asked for them, presumably for walk-ins or internal candidates for roles
+// the drive did not advertise.
+//
+// That has one consequence worth knowing: the /test2.html dropdown now offers
+// two options the drive never advertised. If that is not wanted, remove these
+// two papers rather than hiding them in the page — the server is what decides
+// which positions exist, and a page-only change would drift from it.
+//
+// Same shape as the other 13: 12 questions, 12 marks, 15 minutes, 4 sections
+// of 3, and the same caveat that the answers are engineering judgement rather
+// than signed-off Hagerstone policy.
+
+const MARKETING: RolePaper = {
+  id: "HAG-ROLE-MARKETING-v1",
+  position: "Marketing",
+  department: "Marketing",
+  sections: [
+    { id: "A", name: "Brand & Positioning", count: 3 },
+    { id: "B", name: "Digital & Campaigns", count: 3 },
+    { id: "C", name: "Content & Collateral", count: 3 },
+    { id: "D", name: "Measurement & Judgement", count: 3 },
+  ],
+  questions: [
+    {
+      n: 1, section: "A",
+      q: "What is a positioning statement for?",
+      options: [
+        "It is the tagline used in advertisements",
+        "It states who the offering is for, what it competes against and why it is different, so every campaign says the same thing",
+        "It is the logo and colour guideline",
+        "It is the company's mission statement",
+      ],
+      answer: 1,
+      explanation: "Positioning is the decision every piece of communication inherits. Without it each campaign re-invents the argument and the market hears a different company each time.",
+    },
+    {
+      n: 2, section: "A",
+      scenario: "Hagerstone sells commercial interiors, luxury interiors, civil construction, PEB and façade. One campaign is being planned to cover all five.",
+      q: "What is the best action?",
+      options: [
+        "Run one campaign covering everything, since it is one company",
+        "Decide which vertical and which buyer this campaign is for, and speak to them — a message aimed at everyone reaches no one",
+        "Launch five campaigns simultaneously",
+        "Advertise only the largest vertical",
+      ],
+      answer: 1,
+      explanation: "The person buying a luxury home interior and the person buying a PEB shed are not the same buyer and do not respond to the same proof. One campaign for both persuades neither.",
+    },
+    {
+      n: 3, section: "A",
+      q: "In a B2B business where one project is worth lakhs and the sales cycle runs months, marketing's main job is:",
+      options: [
+        "To generate the largest possible number of leads",
+        "To generate qualified enquiries, and to give sales the credibility it needs to convert them",
+        "To grow the social media following",
+        "To bring the cost per click down",
+      ],
+      answer: 1,
+      explanation: "Volume is the wrong target when each deal takes months of sales effort. Fifty unqualified leads cost more in wasted time than they could ever return.",
+    },
+    {
+      n: 4, section: "B",
+      scenario: "A campaign is getting a very low cost per click, but almost nobody completes the enquiry form.",
+      q: "Where is the problem most likely to be?",
+      options: [
+        "The ad creative — it is not attractive enough",
+        "The landing page or the form: people are clicking, so the ad is working, and losing them after the click",
+        "The audience targeting",
+        "The budget is too small",
+      ],
+      answer: 1,
+      explanation: "A cheap click means the ad did its job. Everything after the click is where the loss is — usually a form that is too long, needs a login, or asks for a file the person does not have on their phone.",
+    },
+    {
+      n: 5, section: "B",
+      q: "A lookalike audience is:",
+      options: [
+        "People who resemble the company's own staff",
+        "New people who resemble an existing source audience, such as past enquirers or customers",
+        "The same people shown the ad repeatedly",
+        "A competitor's followers",
+      ],
+      answer: 1,
+      explanation: "It takes a source list you already have and finds people similar to it. The quality of the output is set entirely by the quality of the source list.",
+    },
+    {
+      n: 6, section: "B",
+      q: "Retargeting means:",
+      options: [
+        "Running the same campaign again next month",
+        "Showing ads to people who have already visited the site or engaged, who convert far better than cold audiences",
+        "Changing which audience is targeted",
+        "Copying a competitor's targeting",
+      ],
+      answer: 1,
+      explanation: "Someone who already looked is the warmest audience available and the cheapest to convert — which is why retargeting usually outperforms every cold campaign running beside it.",
+    },
+    {
+      n: 7, section: "C",
+      q: "For a firm selling fit-out and façade projects, the most persuasive content is usually:",
+      options: [
+        "A company profile PDF",
+        "Completed project photographs and case studies — the brief, the constraints and what was delivered",
+        "Festival greetings and daily posts",
+        "Industry news and articles",
+      ],
+      answer: 1,
+      explanation: "Clients are buying confidence that you can deliver. A finished project they can look at answers that question; a profile only asserts it.",
+    },
+    {
+      n: 8, section: "C",
+      scenario: "A project photograph is excellent, but the client has not approved its use publicly.",
+      q: "What is the best action?",
+      options: [
+        "Publish it — the work is the company's own",
+        "Get the client's written permission first, and confirm whether the client and the site may be named",
+        "Publish it without naming the client",
+        "Ask the site engineer whether it is acceptable",
+      ],
+      answer: 1,
+      explanation: "Many clients treat their premises and their spend as confidential. Publishing without permission risks the relationship and any repeat work, and an unnamed photograph is often still recognisable.",
+    },
+    {
+      n: 9, section: "C",
+      q: "Why should every ad and post carry one clear call to action?",
+      options: [
+        "It makes the creative look professional",
+        "Without one, an interested person has no obvious next step, and the enquiry is simply lost",
+        "The platforms require it",
+        "It increases the reach",
+      ],
+      answer: 1,
+      explanation: "Interest decays in seconds. If the next step is not obvious and immediate, the person moves on and the money spent to reach them is gone.",
+    },
+    {
+      n: 10, section: "D",
+      q: "Which is the more useful measure of marketing for this business?",
+      options: [
+        "Impressions and reach",
+        "Qualified enquiries, and the cost per qualified enquiry",
+        "Follower count",
+        "The number of posts published",
+      ],
+      answer: 1,
+      explanation: "Reach and followers are activity, not outcome. Cost per qualified enquiry is the only number that connects the spend to revenue.",
+    },
+    {
+      n: 11, section: "D",
+      scenario: "Sales reports that the leads from your campaign are poor quality.",
+      q: "What is the best action?",
+      options: [
+        "Increase the budget so more leads come through",
+        "Sit with sales, define what a good lead actually looks like, and change the targeting, the message and the form's qualifying questions accordingly",
+        "Stop the campaign",
+        "Send the same leads across again",
+      ],
+      answer: 1,
+      explanation: "More budget against the wrong definition buys more of the wrong leads. Marketing and sales disagreeing on what qualifies is the root of most of these arguments.",
+    },
+    {
+      n: 12, section: "D",
+      scenario: "A competitor is running ads making claims your company cannot match.",
+      q: "What is the best action?",
+      options: [
+        "Make the same claims to stay competitive",
+        "Compete on what can be substantiated — delivered projects, capability and timelines — because an unsupportable claim collapses at the first client question",
+        "Report the competitor to the platform",
+        "Cut prices in the advertising",
+      ],
+      answer: 1,
+      explanation: "A claim you cannot stand behind wins the click and loses the meeting, and it damages credibility with exactly the clients you most want.",
+    },
+  ],
+};
+
+const ACCOUNTS: RolePaper = {
+  id: "HAG-ROLE-ACCOUNTS-v1",
+  position: "Accounts",
+  department: "Accounts & Finance",
+  sections: [
+    { id: "A", name: "Bookkeeping Fundamentals", count: 3 },
+    { id: "B", name: "GST & Statutory", count: 3 },
+    { id: "C", name: "Payables, Receivables & Controls", count: 3 },
+    { id: "D", name: "Reporting & Judgement", count: 3 },
+  ],
+  questions: [
+    {
+      n: 1, section: "A",
+      q: "In double-entry bookkeeping, every transaction is:",
+      options: [
+        "Recorded once, in the cash book",
+        "Recorded as an equal debit and credit, so the books always balance",
+        "Recorded only when the payment is actually made",
+        "Recorded only at month end",
+      ],
+      answer: 1,
+      explanation: "Every entry has two sides of equal value. That is what makes an out-of-balance trial balance a signal that something is missing rather than a matter of opinion.",
+    },
+    {
+      n: 2, section: "A",
+      scenario: "Material was received last week and the purchase was booked then. The supplier is now being paid.",
+      q: "How is the payment recorded?",
+      options: [
+        "Debit purchases, credit bank",
+        "Debit the supplier's account, credit bank",
+        "Debit bank, credit the supplier's account",
+        "Debit expenses, credit the supplier's account",
+      ],
+      answer: 1,
+      explanation: "The purchase was already expensed when the material was received, creating a payable. Paying it clears that payable — debiting purchases again would book the same cost twice.",
+    },
+    {
+      n: 3, section: "A",
+      q: "A credit note is issued to a customer when:",
+      options: [
+        "The customer places a new order",
+        "An invoice already raised has to be reduced — goods returned, a rate correction, or a quantity rejected",
+        "The customer pays later than agreed",
+        "A fresh invoice has to be raised",
+      ],
+      answer: 1,
+      explanation: "An invoice once issued is not edited or deleted; it is corrected by a credit note, which leaves both the original and the correction on record.",
+    },
+    {
+      n: 4, section: "B",
+      q: "Input tax credit under GST is:",
+      options: [
+        "A discount given by the supplier",
+        "The GST paid on purchases, set off against the GST payable on sales — provided the supplier has actually reported that invoice",
+        "A refund claimed from the customer",
+        "An exemption from paying tax",
+      ],
+      answer: 1,
+      explanation: "It is what stops tax being paid twice on the same value. The condition in the second half is the one that causes real problems, because it depends on somebody else filing.",
+    },
+    {
+      n: 5, section: "B",
+      q: "TDS is deducted:",
+      options: [
+        "By the person receiving the payment",
+        "By the payer, out of the payment being made, and deposited with the government on the payee's behalf",
+        "Only on salary payments",
+        "Once a year, at the end of the financial year",
+      ],
+      answer: 1,
+      explanation: "The obligation sits with the payer, not the payee. Failing to deduct makes the payer liable for the tax plus interest, regardless of what the payee did.",
+    },
+    {
+      n: 6, section: "B",
+      q: "The most common reason input tax credit gets denied is:",
+      options: [
+        "The invoice was handwritten",
+        "The supplier has not filed their return, so the invoice does not appear in the buyer's GSTR-2B",
+        "The payment was made in cash",
+        "The goods were subsequently returned",
+      ],
+      answer: 1,
+      explanation: "Your credit depends on your supplier's compliance, which is why unfiled suppliers have to be chased before the return is filed rather than after.",
+    },
+    {
+      n: 7, section: "C",
+      q: "Before a supplier invoice is passed for payment, it should be matched against:",
+      options: [
+        "The supplier's ledger balance",
+        "The purchase order and the goods receipt note",
+        "The original quotation",
+        "The delivery challan alone",
+      ],
+      answer: 1,
+      explanation: "Ordered, received, invoiced. Three-way matching is the basic control against paying for what was never ordered or never arrived.",
+    },
+    {
+      n: 8, section: "C",
+      q: "A receivables ageing report shows:",
+      options: [
+        "How long the company has been trading",
+        "How long each customer's outstanding amount has been due, so collection effort goes where it is most overdue",
+        "The total sales for the period",
+        "Each customer's credit limit",
+      ],
+      answer: 1,
+      explanation: "A single outstanding total hides which money is a week late and which is six months gone. The ageing is what turns it into a collection plan.",
+    },
+    {
+      n: 9, section: "C",
+      scenario: "A senior asks you to release a payment urgently, before the invoice has been verified.",
+      q: "What is the best action?",
+      options: [
+        "Release it — a senior has instructed it",
+        "Say clearly what verification is still outstanding, and get the approval in writing if it still has to go ahead",
+        "Refuse the instruction",
+        "Release it and complete the verification afterwards",
+      ],
+      answer: 1,
+      explanation: "Urgent payments are sometimes genuinely necessary. What protects everyone is that the exception is visible and owned by the person who authorised it.",
+    },
+    {
+      n: 10, section: "D",
+      q: "A bank reconciliation is done in order to:",
+      options: [
+        "Increase the reported bank balance",
+        "Explain the difference between the book balance and the bank statement, so errors, missing entries and unpresented cheques are found",
+        "Satisfy the auditor at year end",
+        "Calculate the interest earned",
+      ],
+      answer: 1,
+      explanation: "It is a monthly control, not a year-end formality. Most bookkeeping errors surface here first, while they are still small enough to correct easily.",
+    },
+    {
+      n: 11, section: "D",
+      q: "In a project business, why does cash flow matter as much as profit?",
+      options: [
+        "It does not — profit is what counts",
+        "A profitable project can still stop, because material and labour are paid for long before the client's payment arrives",
+        "Profit only matters for tax purposes",
+        "Cash flow is the auditor's concern rather than the company's",
+      ],
+      answer: 1,
+      explanation: "Profit is earned over the project; cash goes out at the start and comes in at the end. Projects that are profitable on paper are exactly the ones that run out of money mid-way.",
+    },
+    {
+      n: 12, section: "D",
+      scenario: "You find an error in a previous month's accounts, which are already closed and reported.",
+      q: "What is the best action?",
+      options: [
+        "Leave it — the month is closed",
+        "Report it to your senior with the amount and its effect, and correct it through a recorded adjusting entry",
+        "Quietly adjust the current month so the totals come right",
+        "Wait and correct it at year end",
+      ],
+      answer: 1,
+      explanation: "A silent adjustment in the current month makes two periods wrong instead of one and leaves no trace of why. The correction has to be visible to be auditable.",
+    },
+  ],
+};
+
 // ── The registry ─────────────────────────────────────────────────────────────
-// Order matches §2.2. Keyed by the exact position string, cedilla included.
+// The first 13 in §2.2 order, then the two added later (see above — they are
+// NOT §2.2 positions). Keyed by the exact position string, cedilla included.
 
 export const ROLE_PAPERS: RolePaper[] = [
   PROJECT_MANAGER,
@@ -2210,6 +2551,8 @@ export const ROLE_PAPERS: RolePaper[] = [
   SALES_MANAGER,
   SALES_EXECUTIVE,
   DOCUMENTATION_CONTROLLER,
+  MARKETING,
+  ACCOUNTS,
 ];
 
 /**

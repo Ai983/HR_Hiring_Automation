@@ -46,7 +46,7 @@ let failures = 0;
 const bad = (msg) => { console.log("  FAIL: " + msg); failures++; };
 
 // ── Structure ────────────────────────────────────────────────────────────────
-if (ROLE_PAPERS.length !== 13) bad(`expected 13 papers, got ${ROLE_PAPERS.length}`);
+if (ROLE_PAPERS.length !== 15) bad(`expected 15 papers, got ${ROLE_PAPERS.length}`);
 
 const ids = new Set();
 for (const p of ROLE_PAPERS) {
@@ -140,7 +140,7 @@ for (const junk of ["", "PEB Design Engineer", "Sales", null, undefined]) {
   if (paperForPosition(junk) !== null) bad(`paperForPosition(${JSON.stringify(junk)}) should be null`);
 }
 
-if (ROLE_POSITION_LIST.length !== 13) bad(`position list has ${ROLE_POSITION_LIST.length} entries`);
+if (ROLE_POSITION_LIST.length !== 15) bad(`position list has ${ROLE_POSITION_LIST.length} entries`);
 if (/answer|explanation/.test(JSON.stringify(ROLE_POSITION_LIST))) bad("position list leaks key material");
 
 // ── Bands ────────────────────────────────────────────────────────────────────

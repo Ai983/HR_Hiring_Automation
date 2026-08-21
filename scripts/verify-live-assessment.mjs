@@ -124,7 +124,8 @@ if (livePositions.join("|") !== bankPositions.join("|")) {
   console.log(`  ${livePositions.length} positions, identical to the bank`);
 }
 
-console.log("\nLevel 2 — all 13 role papers:");
+console.log(`
+Level 2 — all ${ROLEBANK.ROLE_PAPERS.length} role papers:`);
 for (const paper of ROLEBANK.ROLE_PAPERS) {
   const perfect = await checkPaper(paper.position, paper.questions, paper.sections, paper.questions.length, "ROLE", paper.position, "perfect");
   const wrong = await checkPaper(paper.position, paper.questions, paper.sections, paper.questions.length, "ROLE", paper.position, "wrong");
@@ -140,6 +141,7 @@ else console.log(`  refused with 400: "${junk.data.error}"`);
 console.log(
   failures
     ? `\n${failures} FAILURE${failures > 1 ? "S" : ""} — the live function does NOT match the repo.`
-    : "\nLIVE FUNCTION MATCHES THE REPO. All 14 papers verified end to end.",
+    : `
+LIVE FUNCTION MATCHES THE REPO. All ${ROLEBANK.ROLE_PAPERS.length + 1} papers verified end to end.`,
 );
 process.exit(failures ? 1 : 0);
