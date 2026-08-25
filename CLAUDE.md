@@ -92,7 +92,16 @@ npm run attendance:verify-office-team    # must pass after any change here
   and the sample PDF's July figures (19 On Time / 5 Late at 09:30) become
   22 / 2. That is the rule changing, not a regression.
 - **A day with a check-in and no check-out gets BLANK hours, never 0.00.** Zero
-  reads as "worked nothing" and quietly drags the month total down.
+  reads as "worked nothing" and quietly drags the month total down. The mirror
+  case — a check-**out** with no check-in — counts as attended and scores
+  `present`, never `late`: there is no in-time to compare against `late_after`,
+  and guessing would punish a missed punch (`20260825150000`; it was 427 days
+  across 76 people).
+- **A day nobody recorded anywhere stays absent from the report.** If neither
+  the portal nor the sheet has anything, the sheet shows no row rather than an
+  invented one, and no UI offers to type one in. Someone who recorded attendance
+  in neither place genuinely has a shorter month — that is the truthful answer,
+  and manufacturing days to fill it would be worse than the gap.
 - **The footer sums the displayed column, not raw minutes.** Summing rounded
   values ≠ rounding a sum, and a total that does not match the column above it
   is the first thing anyone challenges.

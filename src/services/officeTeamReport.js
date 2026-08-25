@@ -66,11 +66,18 @@ export function buildReport({ subject, summary, days, remarks = [], settings, mo
   const byDate = new Map(remarks.map((r) => [r.remark_date, r.remark]));
   const lateAfter = settings?.late_after;
 
+  // Rows are exactly what hr.attendance_day holds — no invented dates.
+  // If neither the portal nor the sheet has anything for a day, the report says
+  // nothing about that day rather than guessing. A person who recorded
+  // attendance in neither place simply has a shorter month, and that is the
+  // truthful answer.
   const rows = [...days]
     .sort((a, b) => a.work_date.localeCompare(b.work_date))
     .map((d) => {
       const code = LEAVE_CODE[d.leave_type] || "";
-      const attended = !!d.in_at;
+      // Punched out but never in still means they were here. hr.attendance_day
+      // scores that 'present' for the same reason.
+      const attended = !!(d.in_at || d.out_at);
 
       // A half-day or short-leave day is still a day the person turned up, so
       // it keeps an On Time / Late verdict and the code moves to the Leaves
@@ -80,7 +87,9 @@ export function buildReport({ subject, summary, days, remarks = [], settings, mo
       let status;
       if (d.day_status === "holiday") status = "Holiday";
       else if (d.day_status === "week_off") status = "";
-      else if (attended) status = isLate(d.in_at, lateAfter) ? "Late" : "On Time";
+      // No in-time means nothing to compare against late_after, so never Late.
+      else if (d.in_at) status = isLate(d.in_at, lateAfter) ? "Late" : "On Time";
+      else if (attended) status = "On Time";
       else if (d.leave_type) status = "Leave";
       else status = "Absent";
 
@@ -102,8 +111,10 @@ export function buildReport({ subject, summary, days, remarks = [], settings, mo
           byDate.get(d.work_date) || "",
           d.day_status === "holiday" ? d.holiday_name : "",
           d.in_at && !d.out_at ? "No check-out recorded" : "",
+          d.out_at && !d.in_at ? "No check-in recorded" : "",
         ].filter(Boolean).join(" · "),
         missingCheckout: !!d.in_at && !d.out_at,
+        missingCheckin: !!d.out_at && !d.in_at,
         isWeekOff: d.day_status === "week_off",
         isHoliday: d.day_status === "holiday",
         isLate: attended && isLate(d.in_at, lateAfter),
