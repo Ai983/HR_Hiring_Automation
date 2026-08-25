@@ -66,6 +66,7 @@ export default function Sidebar() {
         { id: "attendance",    icon: "⏰", label: "Attendance" },
         { id: "weekly",        icon: "\u{1F5D3}", label: "Weekly Report" },
         { id: "monthly",       icon: "\u{1F4CA}", label: "Monthly Report" },
+        { id: "officeteam",    icon: "\u{1F3E2}", label: "Office Team" },
         { id: "attsetup",      icon: "⚙", label: "Attendance Setup" },
         { id: "location",      icon: "\u{1F4CD}", label: "Location Tracking" },
         { id: "geofence",      icon: "\u{1F5FA}", label: "Geofence Sites" },

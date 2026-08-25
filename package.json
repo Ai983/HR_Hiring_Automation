@@ -11,11 +11,14 @@
     "assessment:verify-roles": "node scripts/verify-role-bank.mjs",
     "assessment:payload": "node scripts/make-deploy-payload.mjs",
     "assessment:verify-payload": "node scripts/verify-deploy-payload.mjs",
-    "assessment:verify-live": "node scripts/verify-live-assessment.mjs"
+    "assessment:verify-live": "node scripts/verify-live-assessment.mjs",
+    "attendance:import-gap": "node scripts/import-hsipl-gap.mjs",
+    "attendance:verify-office-team": "node scripts/verify-office-team-report.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "docx": "^9.6.1",
+    "exceljs": "^4.4.0",
     "leaflet": "^1.9.4",
     "mammoth": "^1.6.0",
     "pdfjs-dist": "^4.0.379",

@@ -13,6 +13,7 @@ import ResumeReport from "./components/panels/ResumeReport.jsx";
 import TodayAttendance from "./components/panels/TodayAttendance.jsx";
 import AttendanceAdmin from "./components/panels/AttendanceAdmin.jsx";
 import MonthlyAttendance from "./components/panels/MonthlyAttendance.jsx";
+import OfficeTeamAttendance from "./components/panels/OfficeTeamAttendance.jsx";
 import WeeklyAttendance from "./components/panels/WeeklyAttendance.jsx";
 import AttendanceSetup from "./components/panels/AttendanceSetup.jsx";
 import LocationTracking from "./components/panels/LocationTracking.jsx";
@@ -104,6 +105,7 @@ function AppContent() {
               {panel === "attendance"   && <AttendanceAdmin />}
               {panel === "weekly"       && <WeeklyAttendance />}
               {panel === "monthly"      && <MonthlyAttendance />}
+              {panel === "officeteam"   && <OfficeTeamAttendance />}
               {panel === "attsetup"     && <AttendanceSetup />}
               {panel === "location"     && <LocationTracking />}
               {panel === "geofence"     && <GeofenceSites />}

@@ -44,6 +44,103 @@ loader → service → stat tiles → CSV export via Blob).
 
 ---
 
+## The Office Team report (built 25 Aug 2026)
+
+Sidebar → Employee Management → **Office Team**. A month sheet per person in the
+layout Hagerstone already prints, downloadable as a real `.xlsx`. Built for the
+EA (`ea@hagerstone.com`, HAG-018).
+
+| Piece | Path |
+|---|---|
+| Panel | `src/components/panels/OfficeTeamAttendance.jsx` |
+| Data access | `src/services/officeTeamService.js` |
+| **Row shaping** | `src/services/officeTeamReport.js` |
+| Excel writer | `src/services/officeTeamExcel.js` |
+| Backfill importer | `scripts/import-hsipl-gap.mjs` |
+| Acceptance test | `scripts/verify-office-team-report.mjs` |
+| Migrations | `20260825120000`, `20260825130000` |
+
+```bash
+npm run attendance:verify-office-team    # must pass after any change here
+```
+
+### Things that will bite
+
+- **`officeTeamReport.js` is the single source of row shape.** The panel and the
+  Excel writer both read from it, and `buildWorkbook` takes reports the panel
+  has *already built* rather than rebuilding them. Do not add a second
+  derivation: the two looked identical when they were written separately too,
+  right up until one changed and the EA was reading different numbers on screen
+  from the ones she was emailing out.
+- **Membership is a stored flag** (`hr.employee_profile.office_team`), not
+  "whoever punched recently". Derived membership drops anyone away for a
+  fortnight, and two of the fifteen had never punched on the portal when the
+  report was built. The EA edits it from **Manage team**.
+- **Managing the team needs `hr.is_hr_admin()`** — roles `admin, hr, founder,
+  management, ai, mis`. HAG-018 is `admin` so it works. **HAG-037 (`ritudesaiwal@`,
+  role `ea`) is not**, and because `attendance_subject` is `security_invoker` and
+  reads `employee_profile`, she would see an *empty* team rather than an error.
+  Widening `is_hr_admin` affects every `hr` table — grant the role instead.
+- **Late is decided at MINUTE granularity** against `late_after`, in the view
+  *and* in `officeTeamReport.isLate`. Deepak Bansal punched 09:30:58 on
+  2026-07-11: second-exact comparison called it Late, the printed sheet says
+  On Time. Never hardcode the threshold — it comes from settings.
+- **`late_after` is 09:40** (`20260825140000`). It was briefly 09:30 to match
+  the printed sheet, but that made six of the fifteen structurally late; the EA
+  set 09:40, and anyone past it is Late with no further leniency. Because
+  `attendance_day` is a view, changing it re-scores every month for everyone —
+  and the sample PDF's July figures (19 On Time / 5 Late at 09:30) become
+  22 / 2. That is the rule changing, not a regression.
+- **A day with a check-in and no check-out gets BLANK hours, never 0.00.** Zero
+  reads as "worked nothing" and quietly drags the month total down.
+- **The footer sums the displayed column, not raw minutes.** Summing rounded
+  values ≠ rounding a sum, and a total that does not match the column above it
+  is the first thing anyone challenges.
+- **ExcelJS is dynamically imported** (`exceljs/dist/exceljs.bare.min.js`) so it
+  stays a lazy 855 KB chunk. Importing it normally puts it in the main bundle
+  and every panel pays for a button most sessions never press. The `bare` build
+  drops core-js polyfills this app never needed.
+
+### The coverage gap is closed
+
+`20260814074535` blanked out **2026-07-31 … 2026-08-11** — the days between the
+end of the HSIPL import and the portal going live — because the spine scored
+them all `absent`. Those days now hold 550 punches and 33 leave rows imported
+from the sheet, so the window is cleared. **The mechanism is kept**: if the
+portal goes dark again, setting `coverage_gap_from/to` is the whole fix.
+
+Re-running the importer is safe — every row is checked against what is already
+in the window. It **refuses to run** if a sheet name is not in its `NAME_MAP`,
+because a guessed name files one person's fortnight under a colleague's.
+
+### ⚠ The 2026 holiday calendar is wrong — do not trust it
+
+`hr.holidays` was seeded by `20260730090000` from the sheet's Setting tab,
+whose dates were **2024's**, with only the year swapped to 2026 (the migration
+header says so, and says to verify them). That works for fixed-date holidays and
+fails for every lunar one:
+
+| | seeded | actually 2026 |
+|---|---|---|
+| New Year, Independence Day, Gandhi Jayanti | 01 Jan, 15 Aug, 02 Oct | ✅ correct |
+| Raksha Bandhan | 19 Aug 2026 | ❌ that was 2024's date |
+| Holi, Ashtami, Ramnavmi, Dusshara, Diwali, Bhaidooj | 2024's dates | ❌ likewise |
+
+This is not cosmetic. `attendance_day` gives a holiday precedence over a punch,
+so on a wrongly-dated holiday everyone who worked gets `day_status = 'holiday'`
+and `day_credit` 0, and the day vanishes from `days_worked` / `on_time` /
+`late`. On 19 Aug 2026, **10 of the 15 office team worked and lost the day.**
+
+**Do not guess replacement dates.** Get the official Hagerstone 2026 list and
+load it through Attendance Setup, which is where holidays belong. Until then the
+office-team report under-counts anyone who worked a wrongly-dated holiday.
+
+Separately worth deciding: even with correct dates, working *on* a holiday
+currently scores zero credit. If people are expected to work holidays, that
+needs its own rule.
+
+---
+
 ## Hard rules
 
 1. **`public.employees` and every non-`hr` schema are read-only from here.** They
