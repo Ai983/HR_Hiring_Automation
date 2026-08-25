@@ -101,17 +101,39 @@ npm run attendance:verify-office-team    # must pass after any change here
   and every panel pays for a button most sessions never press. The `bare` build
   drops core-js polyfills this app never needed.
 
-### The coverage gap is closed
+### The sheet is still running, and the importer has two windows
 
 `20260814074535` blanked out **2026-07-31 … 2026-08-11** — the days between the
 end of the HSIPL import and the portal going live — because the spine scored
-them all `absent`. Those days now hold 550 punches and 33 leave rows imported
-from the sheet, so the window is cleared. **The mechanism is kept**: if the
-portal goes dark again, setting `coverage_gap_from/to` is the whole fix.
+them all `absent`. That window is now filled and cleared. **The mechanism is
+kept**: if the portal goes dark again, setting `coverage_gap_from/to` is the
+whole fix.
 
-Re-running the importer is safe — every row is checked against what is already
-in the window. It **refuses to run** if a sheet name is not in its `NAME_MAP`,
-because a guessed name files one person's fortnight under a colleague's.
+But the sheet did not stop on the 11th, and **not everyone moved to the
+portal**. `import-hsipl-gap.mjs` therefore has two windows:
+
+| window | source of truth | dedupe key |
+|---|---|---|
+| **gap** 31 Jul – 11 Aug | the sheet, solely | exact timestamp — keep every punch, people punch at two sites |
+| **overlap** 12 Aug → sheet end | the **portal**, where it has anything | person + day + type — a sheet punch is dropped only if the portal already holds that type that day |
+
+The first version clipped at 11 Aug and **silently truncated the month for
+everyone still on the sheet**: Yash Kumar Sharma showed 8 working days for
+August with 0 absences, because his record just stopped. 26 people were still
+filing on the sheet after the 12th, two of them (Yash, Bipin Jha) having never
+punched on the portal at all. Re-running the importer prints that list — **if it
+is long, the thing to fix is portal adoption, not the importer.**
+
+Re-running is safe: a second run writes nothing. It **refuses to run** if a
+sheet name is not in `NAME_MAP`, because a guessed name files one person's
+fortnight under a colleague's. That guard is not theoretical — it caught "Aryan
+Tyagi", who only appears in the sheet from 12 Aug.
+
+Note the spine still means **someone who stops punching does not go `absent` —
+their days stop existing.** That is deliberate (it is what stopped the blackout
+inventing absences), but it means a short month can be missing data rather than
+bad attendance. Check `source` and the last day with data before reading a
+short month as absence.
 
 ### ⚠ The 2026 holiday calendar is wrong — do not trust it
 

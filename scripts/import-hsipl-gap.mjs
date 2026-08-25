@@ -44,12 +44,27 @@ if (!SRC_DIR) {
   process.exit(2);
 }
 
-// The gap, inclusive. Do NOT widen past 2026-08-11: from the 12th the portal is
-// the record of truth, and the sheet went on being filled in alongside it for
-// another fortnight. Importing that overlap would double-count every day —
-// e.g. Abhishek Jha's half-day on 13 Aug exists in both.
-const GAP_FROM = "2026-07-31";
-const GAP_TO   = "2026-08-11";
+// ── The two windows ─────────────────────────────────────────────────────────
+//
+// GAP (31 Jul – 11 Aug): the sheet is the ONLY record. The original import
+// ended 30 Jul and the portal went live on the 12th. Every sheet row in here is
+// imported, deduped on the exact timestamp.
+//
+// OVERLAP (12 Aug – wherever the sheet ends): BOTH exist. The portal is the
+// record of truth, but not everyone moved onto it — Yash Kumar Sharma and Bipin
+// Jha have never punched on it once and are still filling in the sheet daily,
+// and others (Saksham, Ritu Ma'am) used the portal for a week and drifted back.
+// Clipping here, as the first version of this script did, silently truncated
+// those people's months: Yash showed 8 working days for August because his
+// record simply stopped on the 11th.
+//
+// So the overlap is imported too, but only where the portal has nothing:
+// a sheet punch is skipped if that person already has a punch OF THE SAME TYPE
+// on that day, from any source. That fills genuinely missing days and missing
+// check-outs, and can never double-count a day the portal already holds.
+const GAP_FROM     = "2026-07-31";
+const GAP_TO       = "2026-08-11";
+const OVERLAP_FROM = "2026-08-12";
 
 // ── The name map ────────────────────────────────────────────────────────────
 // Sheet spelling → hub employee (by email — the only stable key, since
@@ -90,6 +105,7 @@ export const NAME_MAP = {
 
   // ── everyone else in the sheet: stored, but not in the office-team panel ──
   "Akhilesh Gupta":         { email: "guptaakhilesh886@gmail.com" },   // HAG-023
+  "Aryan Tyagi":            { email: "aryanntyagi24@gmail.com" },      // no code; only appears from 12 Aug
   "Amit Choudhary":         { email: "amitsingh151980@gmail.com" },    // HAG-007
   "Arman ali":              { email: "farmanali9540@gmail.com" },      // HAG-021
   "Dilip parashar":         { email: "dilipparashar45@gmail.com" },    // HAG-015
@@ -197,11 +213,13 @@ function readPunches() {
     if (!/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}$/.test(ts)) continue;
     const [d, m, y] = ts.slice(0, 10).split("/");
     const date = `${y}-${m}-${d}`;
-    if (date < GAP_FROM || date > GAP_TO) continue;
+    if (date < GAP_FROM) continue;
     const io = (r[4] || "").trim().toUpperCase();
     if (io !== "IN" && io !== "OUT") continue;
     out.push({
       name: (r[2] || "").trim(),
+      date,
+      window: date <= GAP_TO ? "gap" : "overlap",
       recorded_at: `${date}T${ts.slice(11)}+05:30`,
       time: ts.slice(11),
       type: io === "IN" ? "check_in" : "check_out",
@@ -227,18 +245,16 @@ function readLeave() {
     if (!name || !start || !LEAVE_CODE[code]) continue;
     let end = dmy(r[3]) || start;
     if (end < start) end = start;                       // a few rows have the pair reversed
-    // Clip to the gap, so a sheet leave and a portal leave can never both be
-    // counted for the same day.
     const from = start < GAP_FROM ? GAP_FROM : start;
-    const to   = end   > GAP_TO   ? GAP_TO   : end;
-    if (to < GAP_FROM || from > GAP_TO || from > to) continue;
+    const to   = end;
+    if (to < GAP_FROM || from > to) continue;
     const span = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
     out.push({
       name, code,
       leave_type: LEAVE_CODE[code].type,
       start_date: from, end_date: to,
+      window: to <= GAP_TO ? "gap" : "overlap",
       total_days: LEAVE_CODE[code].fixedDays ?? span,
-      clipped: end > GAP_TO,
     });
   }
   return out;
@@ -259,7 +275,9 @@ if (unmapped.size) {
   process.exit(1);
 }
 
-console.log(`sheet     ${punches.length} punches, ${leave.length} leave rows in ${GAP_FROM}..${GAP_TO}`);
+const sheetEnd = punches.reduce((a, p) => (p.date > a ? p.date : a), GAP_FROM);
+console.log(`sheet     ${punches.length} punches, ${leave.length} leave rows`);
+console.log(`          gap ${GAP_FROM}..${GAP_TO} (sheet is sole record) + overlap ${OVERLAP_FROM}..${sheetEnd} (portal wins)`);
 
 const [employees, roster, sites] = await Promise.all([
   page("employees", "select=id,email,name,is_active", "public"),
@@ -290,21 +308,44 @@ for (const [sheetName, t] of Object.entries(NAME_MAP)) {
   }
 }
 
-// What is already in the window, so a re-run is a no-op.
+// What the database already holds from GAP_FROM onwards. Two indexes, because
+// the two windows dedupe on different keys — see the window comments at the top.
+const priorPunches = await page("attendance",
+  `select=employee_id,person_ref,type,recorded_at&recorded_at=gte.${GAP_FROM}T00:00:00%2B05:30`);
+const istDay = (ts) => new Date(new Date(ts).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
+
+// exact instant — used inside the gap, where the sheet is the only source and
+// every distinct punch it recorded should survive (people punch at two sites).
 const existingPunch = new Set(
-  (await page("attendance", `select=employee_id,person_ref,type,recorded_at&recorded_at=gte.${GAP_FROM}T00:00:00%2B05:30&recorded_at=lt.2026-08-12T00:00:00%2B05:30`))
-    .map((a) => `${a.employee_id || a.person_ref}|${a.type}|${new Date(a.recorded_at).toISOString()}`)
+  priorPunches.map((a) => `${a.employee_id || a.person_ref}|${a.type}|${new Date(a.recorded_at).toISOString()}`)
 );
-const existingLeave = new Set(
-  (await page("leave_requests", `select=employee_id,person_ref,leave_type,start_date,end_date&start_date=lte.${GAP_TO}&end_date=gte.${GAP_FROM}`))
-    .map((l) => `${l.employee_id || l.person_ref}|${l.leave_type}|${l.start_date}|${l.end_date}`)
+// person + day + type — used in the overlap, where a portal punch of that type
+// on that day means the portal already covers it and the sheet must stand down.
+const coveredDayType = new Set(
+  priorPunches.map((a) => `${a.employee_id || a.person_ref}|${a.type}|${istDay(a.recorded_at)}`)
 );
 
+const priorLeave = await page("leave_requests",
+  `select=employee_id,person_ref,leave_type,start_date,end_date&end_date=gte.${GAP_FROM}`);
+const existingLeave = new Set(
+  priorLeave.map((l) => `${l.employee_id || l.person_ref}|${l.leave_type}|${l.start_date}|${l.end_date}`)
+);
+// Any leave already on file for this person overlapping these dates. A sheet
+// leave and a portal leave for the same absence are the same absence.
+const overlapsExistingLeave = (subjectId, from, to) =>
+  priorLeave.some((l) => (l.employee_id || l.person_ref) === subjectId
+    && l.start_date <= to && l.end_date >= from);
+
 const punchRows = [];
+const skipped = { gapDup: 0, portalCovers: 0 };
 for (const p of punches) {
   const s = subject.get(p.name);
-  const key = `${s.employee_id || s.person_ref}|${p.type}|${new Date(p.recorded_at).toISOString()}`;
-  if (existingPunch.has(key)) continue;
+  const sid = s.employee_id || s.person_ref;
+  if (p.window === "overlap") {
+    if (coveredDayType.has(`${sid}|${p.type}|${p.date}`)) { skipped.portalCovers++; continue; }
+  }
+  const key = `${sid}|${p.type}|${new Date(p.recorded_at).toISOString()}`;
+  if (existingPunch.has(key)) { skipped.gapDup++; continue; }
   existingPunch.add(key);                                 // the sheet has exact duplicate rows
   punchRows.push({
     employee_id: s.employee_id, person_ref: s.person_ref,
@@ -321,7 +362,9 @@ for (const p of punches) {
 const leaveRows = [];
 for (const l of leave) {
   const s = subject.get(l.name);
-  const key = `${s.employee_id || s.person_ref}|${l.leave_type}|${l.start_date}|${l.end_date}`;
+  const sid = s.employee_id || s.person_ref;
+  if (l.window === "overlap" && overlapsExistingLeave(sid, l.start_date, l.end_date)) continue;
+  const key = `${sid}|${l.leave_type}|${l.start_date}|${l.end_date}`;
   if (existingLeave.has(key)) continue;
   existingLeave.add(key);
   leaveRows.push({
@@ -335,12 +378,21 @@ for (const l of leave) {
 
 console.log(`resolved  ${subject.size} names -> ${new Set([...subject.values()].map((s) => s.employee_id || s.person_ref)).size} subjects`);
 console.log(`to write  ${punchRows.length} punches, ${leaveRows.length} leave rows`);
-console.log(`skipped   ${punches.length - punchRows.length} punches, ${leave.length - leaveRows.length} leave rows (already present or duplicated in the sheet)`);
+console.log(`skipped   ${skipped.gapDup} already imported, ${skipped.portalCovers} the portal already covers`);
 
-const clipped = leave.filter((l) => l.clipped);
-if (clipped.length) {
-  console.log(`\nclipped at ${GAP_TO} — the tail belongs to the portal, not the sheet:`);
-  for (const l of clipped) console.log(`  ${l.name} ${l.code} from ${l.start_date}`);
+// Who the overlap import is actually for. If this list is long, the portal is
+// not being adopted and that is the thing to fix — not the import.
+const byPerson = new Map();
+for (const p of punchRows.filter((r) => r.recorded_at >= OVERLAP_FROM)) {
+  const sid = p.employee_id || p.person_ref;
+  byPerson.set(sid, (byPerson.get(sid) || 0) + 1);
+}
+if (byPerson.size) {
+  const label = new Map([...subject.entries()].map(([n, s]) => [s.employee_id || s.person_ref, s.label || n]));
+  console.log(`\nstill on the sheet after ${OVERLAP_FROM} — not using the punch portal:`);
+  for (const [sid, n] of [...byPerson.entries()].sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${String(label.get(sid) || sid).padEnd(24)} ${String(n).padStart(3)} punches`);
+  }
 }
 
 if (!APPLY) {
