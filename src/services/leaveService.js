@@ -107,7 +107,7 @@ export async function fetchPaidDaysUsedThisMonth(employeeId, ref = new Date()) {
 
 // Per-employee paid-leave allowance (the HSIPL sheet's "Allowed Leaves", 2.5).
 // Falls back to the config default when no profile row exists yet.
-export async function fetchLeaveAllowance(employeeId, fallback = 2.5) {
+export async function fetchLeaveAllowance(employeeId, fallback = 2) {
   if (!supabase || !employeeId) return fallback;
   const { data, error } = await supabase
     .from("employee_profile").select("allowed_leaves_per_month")

@@ -97,11 +97,19 @@ npm run attendance:verify-office-team    # must pass after any change here
   `present`, never `late`: there is no in-time to compare against `late_after`,
   and guessing would punish a missed punch (`20260825150000`; it was 427 days
   across 76 people).
-- **A day nobody recorded anywhere stays absent from the report.** If neither
-  the portal nor the sheet has anything, the sheet shows no row rather than an
-  invented one, and no UI offers to type one in. Someone who recorded attendance
-  in neither place genuinely has a shorter month — that is the truthful answer,
-  and manufacturing days to fill it would be worse than the gap.
+- **A day nobody recorded anywhere is closed out as UL, by an explicit
+  migration — never by the report.** `buildReport` renders exactly what
+  `hr.attendance_day` holds and invents no dates, and no UI offers to type
+  attendance in. Closing a month is a deliberate, auditable data operation
+  (`20260825170000` did August 2026 for the office team: 25 days across four
+  people). Copy that migration for the next month; do not build a UI for it.
+  Two rules in it are load-bearing:
+  **UL, not CL** — it is the sheet's own convention for an unfiled day, and
+  `paid_days` stays 0 so it cannot eat the 2-day allowance (booking them CL
+  would have put Bipin nine days over an entitlement of two);
+  **the window starts at the person's first record, never at the 1st** — which
+  is what keeps Prashant Kumar's 1–11 Aug out of it. He was onboarded on the
+  11th, and showing a non-employee on leave is worse than showing nothing.
 - **The footer sums the displayed column, not raw minutes.** Summing rounded
   values ≠ rounding a sum, and a total that does not match the column above it
   is the first thing anyone challenges.

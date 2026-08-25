@@ -10,7 +10,7 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
   const [busy, setBusy]   = useState(false);
   const [err, setErr]     = useState("");
   // HSIPL sheet parity: planned days, Sunday working, paid-leave allowance
-  const [rules, setRules] = useState({ planned_days_per_week: 6, works_sunday: false, allowed_leaves_per_month: 2.5 });
+  const [rules, setRules] = useState({ planned_days_per_week: 6, works_sunday: false, allowed_leaves_per_month: 2 });
   const [rulesLoaded, setRulesLoaded] = useState(false);
   const [sites, setSites] = useState([]);
   const [homeSite, setHomeSite] = useState("");
@@ -23,7 +23,7 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
       if (p) setRules({
         planned_days_per_week:    p.planned_days_per_week ?? 6,
         works_sunday:             !!p.works_sunday,
-        allowed_leaves_per_month: p.allowed_leaves_per_month ?? 2.5,
+        allowed_leaves_per_month: p.allowed_leaves_per_month ?? 2,
       });
       setRulesLoaded(true);
     }).catch(() => setRulesLoaded(true));

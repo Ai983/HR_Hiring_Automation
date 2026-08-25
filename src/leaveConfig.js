@@ -7,9 +7,11 @@
 // Anything beyond this in the same month is unpaid (salary deducted).
 // No carry-forward: unused paid days do NOT roll into the next month.
 // Fallback only. The real figure is per-employee in
-// hr.employee_profile.allowed_leaves_per_month (the HSIPL sheet used 2.5),
-// so always prefer the value passed in from the database.
-export const PAID_LEAVE_PER_MONTH = 2.5;
+// hr.employee_profile.allowed_leaves_per_month, so always prefer the value
+// passed in from the database.
+// The HSIPL sheet said 2.5 and that was carried in unquestioned; the EA
+// confirmed on 2026-08-25 that Hagerstone policy is 2 (20260825160000).
+export const PAID_LEAVE_PER_MONTH = 2;
 
 // Leave types — mirrors the existing Google Form ("Type of leave").
 // `value` is what we store; `label` is what the employee sees.

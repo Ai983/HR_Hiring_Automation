@@ -362,7 +362,7 @@ export async function fetchAttendanceSubjects() {
 }
 
 /** Per-person work rules from the HSIPL sheet: planned days, Sunday working,
- *  and the paid-leave allowance ("Allowed Leaves", 2.5 in the sheet). */
+ *  and the paid-leave allowance (the sheet said 2.5; Hagerstone policy is 2). */
 export async function setEmployeeWorkRules(employeeId, { planned_days_per_week, works_sunday, allowed_leaves_per_month }) {
   const fields = {};
   if (planned_days_per_week    !== undefined) fields.planned_days_per_week    = Number(planned_days_per_week);
