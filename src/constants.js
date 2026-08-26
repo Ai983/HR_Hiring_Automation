@@ -72,6 +72,7 @@ export const SURVEY_SOURCES = [
   { id: "instagram", label: "Instagram", color: "#e1306c", bg: "rgba(225,48,108,0.08)" },
   { id: "apna",      label: "Apna",      color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
   { id: "linkedin",  label: "LinkedIn",  color: "#0a66c2", bg: "rgba(10,102,194,0.08)" },
+  { id: "direct",    label: "Walk-in",   color: "#0f766e", bg: "rgba(15,118,110,0.08)" },
 ];
 
 export const AI_RECOMMENDATIONS = {

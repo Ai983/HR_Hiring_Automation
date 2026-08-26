@@ -26,10 +26,11 @@ they are shared with live apps.
 | 12 | `20260819120000_hr_walkin_assessment_attempts.sql` | `assessment_attempts` — the walk-in test (§7 of `HAGERSTONE_DRIVE_AND_ASSESSMENT.md`). Applied 2026-08-19. **No `anon` policy and no `anon` grant** — candidates are anonymous and reach the table only through the service-role `assessment` edge function |
 | 13 | `20260819160000_hr_assessment_v3_five_sections.sql` | `score_section_e`, and the `score_total` ceiling 20 → 25 for the 25-mark v3 paper. The old ceiling would have failed the submit **silently**, for exactly the strongest candidates |
 | 14 | `20260821090000_hr_assessment_role_level2.sql` | the **second-level, position-specific** paper (§7.7 of `HAGERSTONE_DRIVE_AND_ASSESSMENT.md`). Adds `position_applied`, `paper_kind` (`'L1'`/`'ROLE'`) and `section_meta` to the same table, and widens the score ceiling 25 → 50 with headroom so the next paper needs no migration. Additive throughout — every existing level-1 row stays valid and nothing is rewritten. Access model unchanged: still no `anon` policy and no `anon` grant |
+| 15 | `PENDING_hr_attendance_regularization.sql` | **attendance corrections** — `hr.attendance_regularization` override table + `hr.is_attendance_regularizer()` (HR = `hr.admin@`) + `hr.regularize_attendance()` RPC (self-exclusion `subject_id <> my_employee_id` + mandatory reason). Rebuilds `attendance_day` to honour overrides. Applied to the hub via SQL editor **2026-08-26**. `PENDING_` prefix kept for history — rename to a `<timestamp>_` if you re-file it |
 
-`9` is the current definition of `hr.attendance_day` and supersedes `4` and `5`.
-It was applied to production on 2026-08-14 but only captured into this repo on
-2026-08-19, so anything built from files 1-8 alone will be behind production.
+`15` (`PENDING_hr_attendance_regularization.sql`) is now the current definition of
+`hr.attendance_day` and supersedes `9`. It was applied to the hub via the SQL editor on
+2026-08-26 and must run **after** `9`, `10` and `11`. `9` itself superseded `4` and `5`.
 
 Then apply the access model, which is a separate concern and predates these:
 

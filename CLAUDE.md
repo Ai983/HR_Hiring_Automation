@@ -180,6 +180,31 @@ needs its own rule.
 
 ---
 
+## Attendance regularization (built 26 Aug 2026)
+
+`hr.attendance_day` is a view, so a past day can't be edited — a correction is an
+override row the view honours. Sidebar → Employee Management → **Attendance Fix**.
+
+| Piece | Path |
+|---|---|
+| Panel (EA-hidden, HR-only form) | `src/components/panels/AttendanceRegularize.jsx` |
+| Client gate | `isAttendanceRegularizer` / `ATTENDANCE_REGULARIZER_EMAILS` in `src/leaveConfig.js` |
+| Service | `regularizeAttendance` / `fetchRegularizations` in `src/services/attendanceService.js` |
+| Migration (applied 26 Aug) | `supabase/migrations/PENDING_hr_attendance_regularization.sql` |
+
+- **Authority = HR** (`hr.admin@hagerstone.com`) via `hr.is_attendance_regularizer()`,
+  separate from leave approval (EA, `hr.is_leave_approver()`). Checked in RLS **and** in the
+  `hr.regularize_attendance` RPC.
+- **Self-exclusion is load-bearing:** `subject_id <> hr.my_employee_id()` in the RPC and the
+  write policies — nobody corrects their own attendance/pay. To fix an authority's own day,
+  add a second email to the gate. Do not remove this or add a self-edit path.
+- Every correction carries a **mandatory reason**, is stamped `regularized_by` + email, and
+  is listed in the panel. `attendance_day`/`attendance_month` reflect overrides automatically
+  (the view LEFT JOINs the table with top precedence and still emits inside the coverage gap).
+- Same job as the "close a month as UL" migration, but interactive and per-day. Bulk
+  month-close stays a migration; ad-hoc single-day fixes use this.
+
+---
 ## Hard rules
 
 1. **`public.employees` and every non-`hr` schema are read-only from here.** They

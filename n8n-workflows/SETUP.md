@@ -267,3 +267,21 @@ headers, keeping only `Accept-Profile` / `Content-Profile`.
 
 All eight remain **inactive**. Activating them sends real WhatsApp messages to
 real candidates, so that is a deliberate go-live step, not a config detail.
+
+---
+
+## 2026-08-26 — Drive workflows: WF-0 added, WF-1 fixed, WF-2/WF-5 cron bug
+
+Separate from the eight resume/pipeline workflows above. These are the **22 Aug walk-in drive** workflows, on the same n8n instance, pointed at the hub (`tpfvnerrjhqwipyonngf`, `hr` schema).
+
+### WF-0 Drive Form → Survey Leads (Hub) — NEW, ACTIVE (`NiLJ49i2KCp6g2qg`)
+Google Sheets `rowAdded` on the drive form's response sheet (`1Z_DtrVdHEuofHSoG5MfMEz9zgTZxlKWT0I8DqqVsV2k`, "Form Responses 1") → normalise/map → dedupe by phone (`meta_lead_id = gform:<phone>`) → insert `hr.survey_responses` (`source=direct`, `platform=google_form`, `status=new`). **No WhatsApp** — WF-1 already sends M1 on the same sheet, so this is insert-only to avoid double-texting. Uses the "Google Sheets Trigger account" OAuth credential; hub writes use the service-role headers + `Content-Profile: hr`. 21 existing rows were backfilled directly. Drive applicants now appear in the app's **Survey Leads** panel.
+
+### WF-1 M1 Instant Confirmation — FIXED (`7ll0RwAy6AihidFC`)
+The `Normalise Phone` Code node called `require('crypto')`, which the n8n task-runner now disallows — **every run errored from ~18 Aug 18:21 onward**, so ~21 later registrants never got their M1. Fixed 2026-08-26 by replacing the SHA-1 dedupe with a plain-string key (`wa_phone + '|' + Timestamp`); republished. Note the trigger does not re-emit already-seen rows, so the pending M1s are NOT auto-sent by the fix alone — see WF-5 below.
+
+### ⚠ WF-5 sweeper + reply poller & WF-2 M2 — cron month bug, NOT fixed
+`WF-5 Inbound Reply Handler + M1 Sweeper` (`If7EXWOG4LvHo3l2`) and `WF-2 M2 Attendance Confirmation Batch` (`9d9tNypTVgDQcZgQ`) use cron expressions with the **month field set to `7` (July)** instead of `8` (August):
+- M1 sweeper: `0 */30 * 18-22 7 *`  · reply poller: `0 */3 * 18-22 7 *`  · M2: `0 30 5 20 7 *`
+
+So none fired in August: the M1 safety-net never swept the ~21 pending confirmations, YES/NO replies were never captured, and the M2 attendance-confirmation batch never went out. **Decision pending** (not auto-fixed): sending now means real WhatsApps to ~21–23 real candidates. If go: change each cron's month `7` → `8` (and note the drive date has passed, so re-scope the day window as needed). The M2 eligibility filter itself is correct (verified 23/23 current rows eligible).

@@ -1,6 +1,6 @@
 # HireFlow — Attendance / Location / SSO Handoff
 
-_Last updated: 2026-07-30_
+_Last updated: 2026-08-26_
 
 Scope of this document: everything built **after the SEPL `HRMS.md` was shared** — the
 attendance + location + universal-login foundation. **Most of `HRMS.md` (payroll, full
@@ -24,6 +24,29 @@ roster, performance, etc.) is NOT built yet** — see [Not started](#5-not-start
 >    [Pending decisions](#4-in-the-middle--pending-decisions).
 
 ---
+## ★ 2026-08-26 — Attendance regularization, drive-form → hub, M1/M2 status
+
+Three things landed this session. A and B are shipped; C is a live-ops bug the team must still close.
+
+### A. Attendance regularization (governed per-day corrections) — SHIPPED
+`hr.attendance_day` is a computed view, so a past day cannot be edited directly. Added a
+precedence-override the view honours, gated to a designated authority, fully audited.
+
+- **Migration:** `supabase/migrations/PENDING_hr_attendance_regularization.sql` — **applied to the hub via the SQL editor on 2026-08-26** (the `PENDING_` name is historical; it is live). Adds:
+  - `hr.attendance_regularization` — one override row per subject+day (`new_status`, optional `in_at`/`out_at`, **mandatory `reason`**, `regularized_by`+email, `prev_status`, timestamps; `unique(subject_id, work_date)`).
+  - `hr.is_attendance_regularizer()` — authority gate. **Attendance authority = HR (`hr.admin@hagerstone.com`)**, deliberately separate from leave approval, which stays with the EA (`hr.is_leave_approver()` = `ea@`).
+  - `hr.regularize_attendance(subject, date, status, reason, in_at?, out_at?, prev?)` RPC — re-checks the gate + a **self-exclusion rule** (`subject_id <> hr.my_employee_id()`) + mandatory reason, then upserts.
+  - `attendance_day` rebuilt to LEFT JOIN the override with top precedence (status / in / out / worked_minutes / day_credit), emitting corrected days even inside the coverage gap. Still `security_invoker`; `attendance_month` counts from it so corrections roll up automatically.
+- **UI:** Sidebar → Employee Management → **Attendance Fix** (`src/components/panels/AttendanceRegularize.jsx`) — visible only to the regularizer (hidden from EA), form applies via the RPC, list shows every correction (who/when/why). Client gate `isAttendanceRegularizer` / `ATTENDANCE_REGULARIZER_EMAILS` in `src/leaveConfig.js`; service `regularizeAttendance` / `fetchRegularizations` in `src/services/attendanceService.js`.
+- **Prerequisite (confirmed 2026-08-26):** `hr.admin@hagerstone.com` is an active `public.employees` row with a linked `auth_user_id`.
+- **Do not weaken:** the self-exclusion guard is deliberate — nobody edits their own attendance/pay. If HR's own day needs a fix, add a *second* email to `hr.is_attendance_regularizer()` and have that person do it. Do not add a self-edit path.
+
+### B. Drive Google Form → hub `hr.survey_responses` — SHIPPED (n8n)
+The walk-in Google Form's response sheet (`1Z_DtrVdHE…`, "Form Responses 1") previously only fired WhatsApp confirmations; its rows never reached the DB. New active n8n workflow **`WF-0 Drive Form → Survey Leads (Hub)`** (`NiLJ49i2KCp6g2qg`): Sheets `rowAdded` → map → dedupe by phone (`meta_lead_id = gform:<phone>`) → insert `hr.survey_responses` (`source=direct`, `platform=google_form`, `status=new`). No WhatsApp (WF-1 sends M1). 21 existing applicants backfilled. Surfaces in **Survey Leads**; a `direct`→"Walk-in" badge was added to `SURVEY_SOURCES` (`src/constants.js`).
+
+### C. ⚠ M1/M2 drive messaging is BROKEN — team must close
+- **WF-1 M1** (`7ll0RwAy6AihidFC`): `Normalise Phone` used `require('crypto')`, now blocked by the n8n task-runner → every run errored since ~18 Aug. **Fixed + republished 2026-08-26** (plain-string dedupe). Only ~4 earliest registrants ever got M1.
+- **WF-5 sweeper + reply poller** (`If7EXWOG4LvHo3l2`) and **WF-2 M2** (`9d9tNypTVgDQcZgQ`): crons carry **month `7` (July)** not `8` — `0 */30 * 18-22 7 *`, `0 30 5 20 7 *` — so the M1 safety-net sweep, the YES/NO reply poll, and the M2 attendance-confirm batch **never fired in August**. **NOT fixed.** The team must decide whether to send now (real WhatsApps to ~21–23 candidates) and, if so, change the cron month to `8`. The M2 eligibility filter is fine (verified 23/23 eligible).
 
 ## 0. Location-verified attendance + Hub integration (2026-08-01)
 
