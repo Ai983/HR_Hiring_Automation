@@ -29,6 +29,7 @@ import Documents from "./components/panels/Documents.jsx";
 import SurveyLeads from "./components/panels/SurveyLeads.jsx";
 import AssessmentResults from "./components/panels/AssessmentResults.jsx";
 import QuestionBank from "./components/panels/QuestionBank.jsx";
+import AttendanceRegularize from "./components/panels/AttendanceRegularize.jsx";
 import ApplicantModal from "./components/modals/ApplicantModal.jsx";
 import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 
@@ -110,6 +111,7 @@ function AppContent() {
               {panel === "location"     && <LocationTracking />}
               {panel === "geofence"     && <GeofenceSites />}
               {panel === "leave"        && <LeaveRequests />}
+              {panel === "regularize"   && <AttendanceRegularize />}
               {panel === "employees"    && <EmployeeManagement />}
             </>
           )}

@@ -60,6 +60,18 @@ export function isLeaveApprover(email) {
   return LEAVE_APPROVER_EMAILS.includes(String(email).trim().toLowerCase());
 }
 
+// Who may APPLY an attendance correction (regularization). Attendance authority
+// belongs to HR (distinct from leave approval, which stays with the EA). Mirrors
+// the server gate hr.is_attendance_regularizer(). RLS + the RPC enforce this
+// server-side — this only decides whether the correction form renders.
+export const ATTENDANCE_REGULARIZER_EMAILS = ["hr.admin@hagerstone.com"];
+
+/** Is this signed-in user allowed to regularize attendance? Pass ctx.email. */
+export function isAttendanceRegularizer(email) {
+  if (!email) return false;
+  return ATTENDANCE_REGULARIZER_EMAILS.includes(String(email).trim().toLowerCase());
+}
+
 // Request lifecycle.
 export const LEAVE_STATUSES = ["pending", "approved", "rejected", "cancelled"];
 

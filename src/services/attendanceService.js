@@ -413,3 +413,32 @@ export async function deleteRemark(id) {
   const { error } = await supabase.from("attendance_remarks").delete().eq("id", id);
   if (error) throw error;
 }
+
+// ─── ATTENDANCE REGULARIZATION (EA corrections to past days) ─────────────────
+// Applies via hr.regularize_attendance, which re-checks EA + non-self + reason
+// server-side and stamps the signed-in EA as regularized_by. The view
+// hr.attendance_day honours the override with top precedence.
+// See supabase/migrations/PENDING_hr_attendance_regularization.sql.
+export async function regularizeAttendance({ subjectId, workDate, status, reason, inAt = null, outAt = null, prevStatus = null }) {
+  if (!supabase) throw new Error("Supabase not configured.");
+  const { data, error } = await supabase.rpc("regularize_attendance", {
+    p_subject_id: subjectId,
+    p_work_date: workDate,
+    p_status: status,
+    p_reason: reason,
+    p_in_at: inAt,
+    p_out_at: outAt,
+    p_prev_status: prevStatus,
+  });
+  if (error) throw new Error(error.message || "Could not apply the correction.");
+  return data;
+}
+
+export async function fetchRegularizations({ subjectId } = {}) {
+  if (!supabase) return [];
+  let q = supabase.from("attendance_regularization").select("*").order("created_at", { ascending: false }).limit(500);
+  if (subjectId) q = q.eq("subject_id", subjectId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
