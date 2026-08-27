@@ -27,3 +27,6 @@ supabase/.temp/
 
 # Screenshots from scripts/e2e-assessment.mjs — regenerated on every run.
 scratchpad-e2e/
+
+# OMP agent config — .omp/mcp.json holds a live Supabase access token
+.omp/
