@@ -4,13 +4,12 @@ import { PORTALS } from "../../constants.js";
 import { supabase } from "../../supabaseClient.js";
 import { fetchSurveyNewCount } from "../../services/surveyService.js";
 import { fetchPendingLeaveCount } from "../../services/leaveService.js";
-import { isAttendanceRegularizer } from "../../leaveConfig.js";
 import { fetchTodaySubmittedCount } from "../../services/assessmentService.js";
 import SyncStatus from "./SyncStatus.jsx";
 
 export default function Sidebar() {
   const { panel, setPanel, jobs, applicants, setSelectedJob, ctx, hasModule, logout } = useApp();
-  const canRegularize = isAttendanceRegularizer(ctx?.email);
+  const canRegularize = !!ctx?.is_super_admin;
   const [surveyCount, setSurveyCount] = useState(0);
   const [leaveCount, setLeaveCount]   = useState(0);
   const [assessCount, setAssessCount] = useState(0);

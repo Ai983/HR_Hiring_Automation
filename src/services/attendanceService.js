@@ -43,6 +43,17 @@ export async function setEmployeeHomeSite(employeeId, home_site_id) {
   return upsertEmployeeProfile(employeeId, { home_site_id: home_site_id || null });
 }
 
+/** Assign an access level: 'employee' | 'hr_admin' | 'super_admin'.
+ *  Super-admin only — enforced by hr.set_access_level() + a guard trigger. */
+export async function setAccessLevel(employeeId, level) {
+  const { data, error } = await supabase.rpc("set_access_level", {
+    p_employee_id: employeeId,
+    p_level: level,
+  });
+  if (error) throw error;
+  return data;
+}
+
 // Per-site calibration stats (median centre + cluster spread) from real punches.
 export async function fetchSiteCalibration({ days = 120, maxAccuracy = 120 } = {}) {
   if (!supabase) return [];

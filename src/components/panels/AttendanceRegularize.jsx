@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchAttendanceSubjects, fetchRegularizations, regularizeAttendance } from "../../services/attendanceService.js";
-import { isAttendanceRegularizer } from "../../leaveConfig.js";
 import { useApp } from "../../context/AppContext.jsx";
 
-// Statuses the EA can set a day to. Mirrors the CHECK on
+// Statuses a super admin can set a day to. Mirrors the CHECK on
 // hr.attendance_regularization.new_status — all values roll up in attendance_month.
 const STATUS_OPTIONS = [
   { value: "present",     label: "Present (worked)" },
@@ -30,8 +29,7 @@ function fmtTs(v) {
 
 export default function AttendanceRegularize() {
   const { ctx, showToast } = useApp();
-  const canRegularize = isAttendanceRegularizer(ctx?.email);
-  const myId = ctx?.employee_id || null;
+  const canRegularize = !!ctx?.is_super_admin;
 
   const [subjects, setSubjects] = useState([]);
   const [rows, setRows]         = useState([]);
@@ -52,13 +50,12 @@ export default function AttendanceRegularize() {
   useEffect(() => { load(); }, [load]);
 
   const nameFor = (id) => subjects.find((x) => x.subject_id === id)?.full_name || id;
-  const selectable = subjects.filter((s) => s.subject_id !== myId);   // can't pick yourself
+  const selectable = subjects;
 
   const submit = async () => {
     if (!form.subjectId)      return showToast("Pick an employee.", false);
     if (!form.workDate)       return showToast("Pick a date.", false);
     if (!form.reason.trim())  return showToast("A reason is required — it goes on the record.", false);
-    if (myId && form.subjectId === myId) return showToast("You cannot regularize your own record.", false);
     setSaving(true);
     try {
       await regularizeAttendance({
@@ -82,7 +79,7 @@ export default function AttendanceRegularize() {
     <div className="fade-in">
       <div className="page-title">Attendance Corrections</div>
       <div className="page-sub">
-        EA-only. Every change is recorded with who, when and why. You cannot change your own record.
+        Super admin only. Every change is recorded with who, when and why.
       </div>
 
       {canRegularize ? (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchEmployees } from "../../services/attendanceService.js";
 import { fetchLeaveRequests, updateLeaveStatus, deleteLeaveRequest } from "../../services/leaveService.js";
-import { LEAVE_TYPES, APPROVERS, LEAVE_STATUSES, STATUS_META, isLeaveApprover } from "../../leaveConfig.js";
+import { LEAVE_TYPES, APPROVERS, LEAVE_STATUSES, STATUS_META } from "../../leaveConfig.js";
 import { notifyLeaveDecision } from "../../services/whatsappService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
@@ -93,9 +93,9 @@ function ReviewModal({ record, action, onSave, onClose }) {
 
 export default function LeaveRequests() {
   const { showToast, ctx } = useApp();
-  // Only EA decides leaves. Every other admin role keeps the list, the stats and
-  // the CSV export, but not the Approve / Reject / Change / Delete controls.
-  const canDecide = isLeaveApprover(ctx?.email);
+  // Only the HR-admin role decides leaves. Every other user keeps the list, the
+  // stats and the CSV export, but not the Approve / Reject / Change / Delete controls.
+  const canDecide = !!ctx?.is_hr_admin;
   const [records,   setRecords]   = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading,   setLoading]   = useState(true);

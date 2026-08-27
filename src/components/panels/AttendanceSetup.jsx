@@ -257,7 +257,8 @@ function SitesTab() {
 // ─── HOLIDAYS ────────────────────────────────────────────────────────────────
 
 function HolidaysTab() {
-  const { showToast } = useApp();
+  const { showToast, ctx } = useApp();
+  const canEdit = !!ctx?.is_super_admin;
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
   const [rows, setRows] = useState([]);
@@ -287,6 +288,12 @@ function HolidaysTab() {
 
   return (
     <>
+      {!canEdit && (
+        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 9, padding: "10px 14px", fontSize: 12, color: "#9a3412", marginBottom: 14 }}>
+          Read-only — only a super admin can add or remove holidays.
+        </div>
+      )}
+      {canEdit && (
       <div className="card" style={{ marginBottom: 14, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div className="form-field" style={{ maxWidth: 120 }}>
           <label className="form-label">Year</label>
@@ -304,6 +311,7 @@ function HolidaysTab() {
         </div>
         <button className="btn-gold" onClick={add}>+ Add holiday</button>
       </div>
+      )}
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>Loading…</div>
@@ -326,8 +334,8 @@ function HolidaysTab() {
                   </td>
                   <td style={{ padding: "9px 13px", fontWeight: 600, fontSize: 13 }}>{h.name}</td>
                   <td style={{ padding: "9px 13px", textAlign: "right" }}>
-                    <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }}
-                      onClick={() => remove(h.holiday_date, h.name)}>Remove</button>
+                    {canEdit && <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }}
+                      onClick={() => remove(h.holiday_date, h.name)}>Remove</button>}
                   </td>
                 </tr>
               ))}
@@ -342,7 +350,8 @@ function HolidaysTab() {
 // ─── SHIFT & OVERTIME ────────────────────────────────────────────────────────
 
 function ShiftTab() {
-  const { showToast } = useApp();
+  const { showToast, ctx } = useApp();
+  const canEdit = !!ctx?.is_super_admin;
   const [s, setS] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -429,9 +438,16 @@ function ShiftTab() {
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-        <button className="btn-gold" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save rules"}</button>
-      </div>
+      {!canEdit && (
+        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 9, padding: "10px 14px", fontSize: 12, color: "#9a3412", marginTop: 16 }}>
+          Read-only — only a super admin can change the shift &amp; overtime rules.
+        </div>
+      )}
+      {canEdit && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+          <button className="btn-gold" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save rules"}</button>
+        </div>
+      )}
     </div>
   );
 }

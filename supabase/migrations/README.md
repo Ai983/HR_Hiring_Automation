@@ -27,10 +27,15 @@ they are shared with live apps.
 | 13 | `20260819160000_hr_assessment_v3_five_sections.sql` | `score_section_e`, and the `score_total` ceiling 20 → 25 for the 25-mark v3 paper. The old ceiling would have failed the submit **silently**, for exactly the strongest candidates |
 | 14 | `20260821090000_hr_assessment_role_level2.sql` | the **second-level, position-specific** paper (§7.7 of `HAGERSTONE_DRIVE_AND_ASSESSMENT.md`). Adds `position_applied`, `paper_kind` (`'L1'`/`'ROLE'`) and `section_meta` to the same table, and widens the score ceiling 25 → 50 with headroom so the next paper needs no migration. Additive throughout — every existing level-1 row stays valid and nothing is rewritten. Access model unchanged: still no `anon` policy and no `anon` grant |
 | 15 | `PENDING_hr_attendance_regularization.sql` | **attendance corrections** — `hr.attendance_regularization` override table + `hr.is_attendance_regularizer()` (HR = `hr.admin@`) + `hr.regularize_attendance()` RPC (self-exclusion `subject_id <> my_employee_id` + mandatory reason). Rebuilds `attendance_day` to honour overrides. Applied to the hub via SQL editor **2026-08-26**. `PENDING_` prefix kept for history — rename to a `<timestamp>_` if you re-file it |
+| 16 | `20260827120000_hr_drop_email_authority_gates.sql` | **governance step 1** — drops the two email-keyed gates `hr.is_leave_approver()` (ea@) and `hr.is_attendance_regularizer()` (hr.admin@). Leave decisions and attendance regularization both re-point to the `hr.is_hr_admin()` role; regularization self-exclusion preserved. Adds `is_hr_admin` to `hr.my_context()` so the UI gates on a role, not an email. Apply after `15`. **Not yet applied to the hub** as of 2026-08-27 |
+| 17 | `20260827130000_hr_three_role_access_model.sql` | **governance step 2** — the 3-role model. Adds `hr.employee_profile.access_level` (`employee`/`hr_admin`/`super_admin`), re-homes `hr.is_hr_admin()` onto it, adds `hr.is_super_admin()`, a guard trigger + `hr.set_access_level()` RPC (super-admin-only role assignment), and moves to **super-admin-only**: `attendance_settings` + `holidays` writes, attendance regularization (Attendance Fix), and raw `attendance` UPDATE/DELETE. hr_admin keeps attendance INSERT + read. Adds `is_super_admin` to `my_context()`. **Explicit seed — fill the 2 hr_admin emails + super_admin email(s); everyone else becomes `employee`.** Apply after `16`. **Not yet applied to the hub** as of 2026-08-27 |
 
-`15` (`PENDING_hr_attendance_regularization.sql`) is now the current definition of
-`hr.attendance_day` and supersedes `9`. It was applied to the hub via the SQL editor on
-2026-08-26 and must run **after** `9`, `10` and `11`. `9` itself superseded `4` and `5`.
+`17` (`20260827130000_hr_three_role_access_model.sql`) is the current access model:
+authority is `hr.employee_profile.access_level` (employee / hr_admin / super_admin), assigned
+from the employee dashboard. It supersedes the role-based `hr.is_hr_admin()` from `10`/`16`.
+`15` (`PENDING_hr_attendance_regularization.sql`) is the current definition of
+`hr.attendance_day` and supersedes `9`; it runs **after** `9`, `10` and `11`. `9` itself
+superseded `4` and `5`. Apply in order: `15` → `16` → `17`.
 
 Then apply the access model, which is a separate concern and predates these:
 

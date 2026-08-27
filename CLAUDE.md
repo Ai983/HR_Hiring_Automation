@@ -187,22 +187,47 @@ override row the view honours. Sidebar → Employee Management → **Attendance 
 
 | Piece | Path |
 |---|---|
-| Panel (EA-hidden, HR-only form) | `src/components/panels/AttendanceRegularize.jsx` |
-| Client gate | `isAttendanceRegularizer` / `ATTENDANCE_REGULARIZER_EMAILS` in `src/leaveConfig.js` |
+| Panel (form shown to the super_admin role only) | `src/components/panels/AttendanceRegularize.jsx` |
+| Client gate | `ctx.is_super_admin` (from `hr.my_context()`) — no email list |
 | Service | `regularizeAttendance` / `fetchRegularizations` in `src/services/attendanceService.js` |
-| Migration (applied 26 Aug) | `supabase/migrations/PENDING_hr_attendance_regularization.sql` |
+| Migrations | `PENDING_hr_attendance_regularization.sql`, then `20260827120000`, then `20260827130000` |
 
-- **Authority = HR** (`hr.admin@hagerstone.com`) via `hr.is_attendance_regularizer()`,
-  separate from leave approval (EA, `hr.is_leave_approver()`). Checked in RLS **and** in the
-  `hr.regularize_attendance` RPC.
-- **Self-exclusion is load-bearing:** `subject_id <> hr.my_employee_id()` in the RPC and the
-  write policies — nobody corrects their own attendance/pay. To fix an authority's own day,
-  add a second email to the gate. Do not remove this or add a self-edit path.
+- **Authority = the `super_admin` role** via `hr.is_super_admin()`, checked in RLS **and** in the
+  `hr.regularize_attendance` RPC. Regularization is deliberately super-admin only — an `hr_admin`
+  cannot correct past days. (History: HR-email gate → `is_hr_admin` on 2026-08-27 step 1 →
+  `is_super_admin` on 2026-08-27 step 2.)
+- **No self-exclusion needed:** only super_admin can regularize, and a super_admin may correct
+  any day including their own. There is no separate "cannot edit your own" guard anymore.
 - Every correction carries a **mandatory reason**, is stamped `regularized_by` + email, and
   is listed in the panel. `attendance_day`/`attendance_month` reflect overrides automatically
   (the view LEFT JOINs the table with top precedence and still emits inside the coverage gap).
 - Same job as the "close a month as UL" migration, but interactive and per-day. Bulk
   month-close stays a migration; ad-hoc single-day fixes use this.
+
+---
+## Access model — 3 roles (built 27 Aug 2026)
+
+Authority is a single field, `hr.employee_profile.access_level`, assigned from the
+employee dashboard (Employees → HR Settings, super-admin only). `public.employees.role`
+and `public.roles` are read-only from here, so authority lives in the `hr` schema instead.
+
+| Role | Can |
+|---|---|
+| `employee` | self only — punch, own history, own leave |
+| `hr_admin` | all day-to-day ops for anyone: approve/reject leave, mark/backfill attendance, manage sites/geofence/roster/office-team, edit profiles + PINs. **Cannot** edit/delete existing punches, regularize, change rules, or assign roles |
+| `super_admin` | everything hr_admin can, **plus** edit/delete punches, regularize past days (Attendance Fix), change the time/rules (`attendance_settings` + holidays), and assign roles — for anyone including themselves |
+
+- **`hr.is_hr_admin()`** = `hr_admin` OR `super_admin`; **`hr.is_super_admin()`** = top tier only.
+  Every existing policy calls `is_hr_admin()`, so it followed the switch with no edits.
+- **Roles are assigned only via `hr.set_access_level()`** (super-admin-only RPC) and protected
+  by a guard trigger on `employee_profile` — an `hr_admin` cannot escalate itself by PATCHing
+  the column. The client reads `ctx.is_hr_admin` / `ctx.is_super_admin` from `hr.my_context()`.
+- **Do not re-introduce email-keyed gates.** The old `is_leave_approver` (ea@) and
+  `is_attendance_regularizer` (hr.admin@) were removed 27 Aug (`20260827120000`, `20260827130000`).
+  Grant a role, don't special-case an email.
+- **Bootstrap:** the step-2 migration seeds the named `hr_admin` emails + the `super_admin`
+  email(s); **everyone else becomes `employee`**. Both email lists must be filled before the
+  migration is applied — it is the clean 3-role reset, not an additive grant.
 
 ---
 ## Hard rules

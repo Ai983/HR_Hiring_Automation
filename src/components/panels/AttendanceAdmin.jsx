@@ -79,7 +79,7 @@ function SelfieModal({ url, name, onClose }) {
 }
 
 export default function AttendanceAdmin() {
-  const { showToast } = useApp();
+  const { showToast, ctx } = useApp();
   const [records,   setRecords]   = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -264,10 +264,12 @@ export default function AttendanceAdmin() {
                       {rec.admin_notes || <span style={{ color: "#b0a898" }}>—</span>}
                     </td>
                     <td style={{ padding: "11px 14px" }}>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditModal(rec)}>Edit</button>
-                        <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }} onClick={() => handleDelete(rec)}>Del</button>
-                      </div>
+                      {ctx?.is_super_admin ? (
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setEditModal(rec)}>Edit</button>
+                          <button className="btn-ghost" style={{ fontSize: 12, color: "#dc2626" }} onClick={() => handleDelete(rec)}>Del</button>
+                        </div>
+                      ) : <span style={{ fontSize: 12, color: "#b0a898" }}>—</span>}
                     </td>
                   </tr>
                 );

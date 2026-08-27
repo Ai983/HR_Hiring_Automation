@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchEmployees, setEmployeePin, setTrackLocation, setEmployeeWorkRules, setEmployeeHomeSite, fetchEmployeeProfile, fetchSites } from "../../services/attendanceService.js";
+import { fetchEmployees, setEmployeePin, setTrackLocation, setEmployeeWorkRules, setEmployeeHomeSite, fetchEmployeeProfile, fetchSites, setAccessLevel } from "../../services/attendanceService.js";
 import { useApp } from "../../context/AppContext.jsx";
 
 // HR settings modal — identity is read-only (synced from the company master);
@@ -14,12 +14,16 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
   const [rulesLoaded, setRulesLoaded] = useState(false);
   const [sites, setSites] = useState([]);
   const [homeSite, setHomeSite] = useState("");
+  const { ctx } = useApp();
+  const [accessLevel, setAccessLvl] = useState("employee");
+  const [initialLevel, setInitialLevel] = useState("employee");
 
   useEffect(() => {
     let alive = true;
     fetchEmployeeProfile(emp.id).then((p) => {
       if (!alive) return;
       if (p) setHomeSite(p.home_site_id || "");
+      if (p) { setAccessLvl(p.access_level || "employee"); setInitialLevel(p.access_level || "employee"); }
       if (p) setRules({
         planned_days_per_week:    p.planned_days_per_week ?? 6,
         works_sunday:             !!p.works_sunday,
@@ -42,6 +46,7 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
       if (pin) await setEmployeePin(emp.id, pin);
       if (rulesLoaded) await setEmployeeWorkRules(emp.id, rules);
       if (rulesLoaded) await setEmployeeHomeSite(emp.id, homeSite);
+      if (ctx?.is_super_admin && accessLevel !== initialLevel) await setAccessLevel(emp.id, accessLevel);
       onSaved();
     } catch (e) {
       setErr(e.message || "Failed to save. Try again.");
@@ -98,6 +103,23 @@ function HrSettingsModal({ emp, onSaved, onClose }) {
               {emp.pin ? "A PIN is set — the employee can punch attendance." : "No PIN yet — required before this employee can punch attendance."}
             </div>
           </div>
+
+          {ctx?.is_super_admin && (
+            <>
+              <div style={{ height: 1, background: "#e8e2d9", margin: "8px 0" }} />
+              <div className="form-field">
+                <label className="form-label">Access level (role)</label>
+                <select className="form-input" value={accessLevel} onChange={(e) => setAccessLvl(e.target.value)}>
+                  <option value="employee">Employee — self service only</option>
+                  <option value="hr_admin">HR Admin — attendance &amp; leave for anyone</option>
+                  <option value="super_admin">Super Admin — also change rules &amp; assign roles</option>
+                </select>
+                <div style={{ fontSize: 11, color: "#8a7e72", marginTop: 4 }}>
+                  Only a super admin can set this. Applied when you press Save.
+                </div>
+              </div>
+            </>
+          )}
 
           <div style={{ height: 1, background: "#e8e2d9", margin: "8px 0" }} />
           <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 6 }}>
