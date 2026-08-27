@@ -102,10 +102,6 @@ export default function Dashboard() {
                 </div>
               );
             })}
-            <div className="divider" style={{ margin: "14px 0" }} />
-            <button className="btn-gold" style={{ width: "100%", justifyContent: "center" }} onClick={() => setPanel("post")}>
-              + Post a New Job
-            </button>
           </div>
 
           {/* Portal summary */}

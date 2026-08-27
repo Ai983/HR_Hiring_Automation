@@ -43,7 +43,6 @@ export default function Sidebar() {
       icon: "\u{1F9ED}",
       label: "Onboarding",
       items: [
-        { id: "post",          icon: "✦", label: "Post a Job" },
         { id: "jobs",          icon: "≡", label: "All Jobs",        badge: liveJobs },
         { id: "applicants",    icon: "◎", label: "Applicants",      badge: newApps },
         { id: "survey",        icon: "📋", label: "Survey Leads",    badge: surveyCount },

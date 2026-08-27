@@ -5,7 +5,6 @@ import Login from "./components/auth/Login.jsx";
 import Sidebar from "./components/layout/Sidebar.jsx";
 import Toast from "./components/layout/Toast.jsx";
 import Dashboard from "./components/panels/Dashboard.jsx";
-import PostJob from "./components/panels/PostJob.jsx";
 import AllJobs from "./components/panels/AllJobs.jsx";
 import Applicants from "./components/panels/Applicants.jsx";
 import Questionnaire from "./components/panels/Questionnaire.jsx";
@@ -34,7 +33,7 @@ import ApplicantModal from "./components/modals/ApplicantModal.jsx";
 import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 
 // Which module each panel belongs to.
-const HIRING = new Set(["dashboard", "post", "jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment", "questionbank"]);
+const HIRING = new Set(["dashboard", "jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment", "questionbank"]);
 export const moduleForPanel = (p) => (HIRING.has(p) ? "hireflow" : "attendance");
 
 function Splash({ text }) {
@@ -88,7 +87,6 @@ function AppContent() {
           ) : (
             <>
               {panel === "dashboard"    && <Dashboard />}
-              {panel === "post"         && <PostJob />}
               {panel === "jobs"         && <AllJobs />}
               {panel === "applicants"   && <Applicants />}
               {panel === "calling"      && <CallingQueue />}

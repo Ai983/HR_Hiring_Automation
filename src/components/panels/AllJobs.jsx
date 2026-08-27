@@ -32,16 +32,11 @@ export default function AllJobs() {
 
   return (
     <div className="fade-in">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-        <div>
-          <div className="page-title">All Jobs</div>
-          <div className="page-sub">
-            {jobs.length} total &middot; {liveJobs} live
-          </div>
+      <div style={{ marginBottom: 24 }}>
+        <div className="page-title">All Jobs</div>
+        <div className="page-sub">
+          {jobs.length} total &middot; {liveJobs} live
         </div>
-        <button className="btn-gold" onClick={() => setPanel("post")}>
-          + Post a Job
-        </button>
       </div>
 
       {jobs.map((job) => (
