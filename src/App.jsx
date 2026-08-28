@@ -36,6 +36,22 @@ import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 const HIRING = new Set(["dashboard", "jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment", "questionbank"]);
 export const moduleForPanel = (p) => (HIRING.has(p) ? "hireflow" : "attendance");
 
+// Panels only a super_admin may open at all — not even read-only.
+//
+// The sidebar already hides these, but hiding a nav item is not access control:
+// `panel` is also settable from the URL (?panel=regularize), which is how the
+// EA reached Attendance Corrections and read every correction ever made, on a
+// page that then told her she was not allowed to use it.
+//
+// NOTE: the matching RLS on hr.attendance_regularization stays deliberately at
+// `is_hr_admin() OR own rows` and must NOT be narrowed to super_admin.
+// hr.attendance_day is security_invoker and LEFT JOINs that table, so an EA who
+// could not read it would see every regularized day silently revert to its raw
+// punch values — twelve of Aniket's corrected days would read 'absent' again in
+// her own Office Team report. The data must stay readable for the reports to be
+// right; it is the CORRECTIONS SCREEN that is super-admin-only.
+const SUPER_ONLY = new Set(["regularize"]);
+
 function Splash({ text }) {
   return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f7f4ef", color: "#8a7e72", fontSize: 14 }}>{text}</div>;
 }
@@ -69,7 +85,8 @@ function AppContent() {
   if (!ctx) return <NoAccess msg="Your login isn't linked to an employee record yet. Contact HR." />;
   if (!hasModule("hireflow") && !hasModule("attendance")) return <NoAccess msg="You don't have access to HireFlow. Ask an admin to grant the hireflow or attendance module." />;
 
-  const allowed = hasModule(moduleForPanel(panel));
+  const allowed = hasModule(moduleForPanel(panel))
+    && (!SUPER_ONLY.has(panel) || !!ctx.is_super_admin);
 
   return (
     <>
