@@ -86,7 +86,12 @@ const check = (label, got, want) => {
 // ── 1. The office team is what the migration says it is ─────────────────────
 console.log("\n[1] office team membership");
 const team = await q("attendance_subject", "select=*&office_team=is.true&is_active=is.true&order=full_name");
-check("office team size", team.length, 15);
+// NOT a fixed count: the EA adds and removes people from the panel's Manage
+// team dialog, so hardcoding a number here just breaks the test every time she
+// uses the feature as intended. What must hold is that the list is non-empty
+// and that everyone on it can actually punch.
+check("office team is populated", team.length > 0, true);
+console.log(`        ${team.length} people`);
 const codes = team.map((t) => t.employee_code || `(${t.full_name})`).join(", ");
 console.log(`        ${codes}`);
 for (const t of team) {

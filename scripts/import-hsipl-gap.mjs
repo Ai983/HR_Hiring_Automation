@@ -106,6 +106,11 @@ export const NAME_MAP = {
   // ── everyone else in the sheet: stored, but not in the office-team panel ──
   "Akhilesh Gupta":         { email: "guptaakhilesh886@gmail.com" },   // HAG-023
   "Aryan Tyagi":            { email: "aryanntyagi24@gmail.com" },      // no code; only appears from 12 Aug
+  // Joined 2026-08-25; hub records created on the 26th. Exact name matches.
+  // "Anshul Singh" is NOT HAG-008 "Anshul Verma" (Design Team, joined May) —
+  // different person, same first name.
+  "Anshul Singh":           { email: "bhanshul9@gmail.com" },          // HAG-078
+  "Avi Tyagi":              { email: "avityagi0333@gmail.com" },       // HAG-077
   "Amit Choudhary":         { email: "amitsingh151980@gmail.com" },    // HAG-007
   "Arman ali":              { email: "farmanali9540@gmail.com" },      // HAG-021
   "Dilip parashar":         { email: "dilipparashar45@gmail.com" },    // HAG-015
