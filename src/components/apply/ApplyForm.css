@@ -1,0 +1,186 @@
+/* ── Candidate application form ───────────────────────────────────────
+   Scoped with an `af-` prefix, mirroring AssessmentPortal.css (`as-`) and
+   AttendancePortal.css (`ap-`). This file styles `body` and `#apply-root`
+   globally — it is only ever loaded by /apply.html, which mounts nothing
+   else.
+
+   Phone first: the link arrives over WhatsApp and most people open it on a
+   mid-range Android. 16px inputs (anything smaller makes iOS zoom on
+   focus), 44px+ tap targets, one column until 560px. */
+
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  background:#f7f4ef;
+  font-family:'Nunito',sans-serif;
+  color:#1a1612;
+  min-height:100vh;
+  -webkit-text-size-adjust:100%;
+}
+
+#apply-root{width:100%;max-width:620px;margin:0 auto;padding:0 16px 48px;}
+
+button,.af-chip{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.25s ease both;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.af-spinner{
+  display:inline-block;width:16px;height:16px;
+  border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;
+  border-radius:50%;animation:spin 0.65s linear infinite;vertical-align:middle;
+  margin-right:6px;
+}
+
+/* ── Layout ──────────────────────────────────────────────────────── */
+.af-shell{width:100%;padding-top:28px;}
+.af-center{
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:24px;padding:32px 0;
+}
+
+.af-brand{display:flex;align-items:center;gap:14px;}
+.af-logo{
+  width:50px;height:50px;border-radius:14px;flex-shrink:0;
+  background:linear-gradient(135deg,#e8a24a,#c97a2a);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif;font-weight:700;font-size:24px;color:#1a1612;
+}
+.af-company{font-family:'Fraunces',serif;font-size:20px;font-weight:700;}
+.af-tagline{font-size:12px;color:#8a7e72;margin-top:2px;}
+
+.af-head{display:flex;flex-direction:column;gap:14px;margin-bottom:22px;}
+.af-title{
+  font-family:'Fraunces',serif;font-size:26px;font-weight:700;line-height:1.2;
+  margin-top:6px;
+}
+.af-sub{font-size:14px;color:#5a5048;line-height:1.55;}
+.af-req{color:#c9502a;font-weight:700;}
+
+/* ── Card (used by the confirmation screen) ──────────────────────── */
+.af-card{
+  width:100%;max-width:440px;
+  background:#fff;border:1px solid #e8e2d9;border-radius:18px;
+  padding:28px 24px;display:flex;flex-direction:column;gap:14px;
+}
+.af-card-narrow{text-align:center;align-items:center;}
+.af-card-title{font-family:'Fraunces',serif;font-size:20px;font-weight:700;line-height:1.3;}
+.af-icon{
+  width:56px;height:56px;border-radius:50%;
+  background:#e9f3ea;color:#3f7d4c;
+  display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;
+}
+.af-body{font-size:14px;color:#5a5048;line-height:1.6;}
+.af-note{font-size:12px;color:#8a7e72;line-height:1.5;}
+
+/* ── Form ────────────────────────────────────────────────────────── */
+.af-form{display:flex;flex-direction:column;gap:18px;}
+
+.af-section{
+  background:#fff;border:1px solid #e8e2d9;border-radius:16px;
+  padding:20px 18px;
+}
+.af-section-title{
+  font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;
+  color:#c97a2a;margin-bottom:16px;
+}
+
+.af-grid{display:grid;grid-template-columns:1fr;gap:16px;}
+@media (min-width:560px){
+  .af-grid{grid-template-columns:1fr 1fr;}
+  .af-span2{grid-column:span 2;}
+}
+
+.af-field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.af-label{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;
+  color:#5a5048;
+}
+.af-input{
+  background:#faf8f5;border:1.5px solid #e0d9cf;border-radius:10px;
+  padding:13px 14px;font-family:'Nunito',sans-serif;font-size:16px;color:#1a1612;
+  width:100%;min-height:48px;
+}
+.af-input:focus{outline:none;border-color:#c97a2a;background:#fff;}
+.af-input::placeholder{color:#b0a898;}
+
+/* Chrome/Safari render number spinners that sit under the unit suffix and
+   are impossible to hit on a phone anyway. */
+.af-input[type=number]{-moz-appearance:textfield;appearance:textfield;}
+.af-input[type=number]::-webkit-outer-spin-button,
+.af-input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+
+/* Unit suffix ("years", "LPA") sits inside the field so the number and its
+   unit cannot be separated by a line wrap on a narrow screen. */
+.af-suffix-wrap{position:relative;display:flex;align-items:center;}
+.af-input-suffixed{padding-right:64px;}
+.af-suffix{
+  position:absolute;right:14px;
+  font-size:13px;font-weight:700;color:#8a7e72;pointer-events:none;
+}
+
+.af-hint{font-size:11.5px;color:#8a7e72;line-height:1.45;}
+.af-field-error{font-size:12px;color:#a3352f;font-weight:600;line-height:1.4;}
+
+/* ── Skills chip input ───────────────────────────────────────────── */
+.af-chips{
+  display:flex;flex-wrap:wrap;gap:7px;align-items:center;
+  background:#faf8f5;border:1.5px solid #e0d9cf;border-radius:10px;
+  padding:9px 10px;min-height:48px;
+}
+.af-chips:focus-within{border-color:#c97a2a;background:#fff;}
+.af-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#fdf3e3;border:1px solid #f0dcb8;color:#8a6a2a;
+  border-radius:20px;padding:5px 6px 5px 12px;
+  font-size:13px;font-weight:600;max-width:100%;
+  overflow-wrap:anywhere;
+}
+.af-chip-x{
+  border:none;background:rgba(138,106,42,0.12);color:#8a6a2a;
+  width:20px;height:20px;border-radius:50%;flex-shrink:0;
+  font-size:10px;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.af-chip-input{
+  flex:1;min-width:130px;border:none;background:transparent;outline:none;
+  font-family:'Nunito',sans-serif;font-size:16px;color:#1a1612;padding:5px 2px;
+}
+.af-chip-input::placeholder{color:#b0a898;}
+
+/* ── Errors ──────────────────────────────────────────────────────── */
+.af-error{
+  background:#fdecec;border:1px solid #f3c9c9;border-radius:10px;
+  padding:11px 13px;font-size:13px;color:#a3352f;line-height:1.45;font-weight:600;
+}
+.af-error-block{margin-bottom:16px;}
+
+/* ── Actions ─────────────────────────────────────────────────────── */
+.af-actions{display:flex;flex-direction:column;gap:12px;align-items:stretch;}
+.af-btn{
+  background:linear-gradient(135deg,#e8a24a,#c97a2a);
+  border:none;border-radius:12px;
+  padding:16px 22px;min-height:52px;
+  font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;color:#1a1612;
+  cursor:pointer;width:100%;
+}
+.af-btn:disabled{opacity:0.6;cursor:default;}
+.af-privacy{text-align:center;}
+
+.af-progress{
+  text-align:center;font-size:11px;color:#b0a898;font-weight:600;
+  letter-spacing:0.4px;
+}
+
+/* ── Honeypot ────────────────────────────────────────────────────── */
+/* Off-screen rather than display:none — some bots skip hidden inputs, and
+   the point is for them to fill it in. */
+.af-hp{
+  position:absolute;left:-9999px;top:auto;
+  width:1px;height:1px;overflow:hidden;
+}

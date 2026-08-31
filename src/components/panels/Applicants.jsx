@@ -233,7 +233,11 @@ export default function Applicants() {
                     style={{ opacity: isDragging ? 0.4 : 1, cursor: "grab", userSelect: "none", transition: "opacity 0.15s" }}
                   >
                     <div className="k-name">{app.name}</div>
-                    <div className="k-meta">{job?.title || "Unknown role"}</div>
+                    {/* A self-applied candidate has no job_id yet — they typed a
+                        designation, and HR attaches them to a real opening later.
+                        Falling through to the designation stops every form
+                        submission rendering as "Unknown role". */}
+                    <div className="k-meta">{job?.title || app.designation || "Unknown role"}</div>
                     <div className="k-meta" style={{ marginTop: 4 }}>
                       <span style={{ background: src.bg, color: src.color, padding: "2px 7px", borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
                         {src.label}

@@ -69,5 +69,16 @@ export function dbApplicantToApp(row) {
     shortlisted: row.shortlisted ?? false,
     screening_notes: row.screening_notes,
     appliedDate: row.applied_at,
+    // Structured profile — populated by the public /apply.html form, null on
+    // applicants that arrived from a portal or were keyed in by hand.
+    designation: row.designation,
+    department: row.department,
+    location: row.location,
+    industry: row.industry,
+    experienceYears: row.total_experience_years,
+    skills: Array.isArray(row.skills) ? row.skills : [],
+    currentCtc: row.current_ctc,
+    expectedCtc: row.expected_ctc,
+    noticePeriod: row.notice_period,
   };
 }

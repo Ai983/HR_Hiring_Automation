@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../../context/AppContext.jsx";
-import { STAGES, STAGE_META, PORTALS } from "../../constants.js";
+import { STAGES, STAGE_META, PORTALS, SOURCE_META } from "../../constants.js";
 import { fmtDate } from "../../helpers.js";
 import { screenApplicant } from "../../services/applicantService.js";
 import { updateApplicantStage } from "../../services/applicantService.js";
@@ -41,7 +41,28 @@ export default function ApplicantModal({ app, onClose }) {
     showToast(`Moved to ${STAGE_META[newStage].label}`);
   };
 
-  const portal = PORTALS.find((x) => x.id === app.portal) || {};
+  // PORTALS only lists the six job boards we post to, so sources like
+  // "manual", "whatsapp" and "form" fall through to SOURCE_META for a label.
+  const portalLabel =
+    PORTALS.find((x) => x.id === app.portal)?.label ||
+    SOURCE_META[app.portal]?.label ||
+    app.portal;
+
+  // Only the public form fills these in. An applicant who arrived from a job
+  // board has them all null, and the block is hidden rather than showing a
+  // grid of em-dashes.
+  const profile = [
+    ["Designation", app.designation],
+    ["Department", app.department],
+    ["Location", app.location],
+    ["Industry", app.industry],
+    ["Experience", app.experienceYears != null ? `${app.experienceYears} yr` : null],
+    ["Notice period", app.noticePeriod],
+    ["Current CTC", app.currentCtc != null ? `₹${app.currentCtc} LPA` : null],
+    ["Expected CTC", app.expectedCtc != null ? `₹${app.expectedCtc} LPA` : null],
+  ].filter(([, v]) => v !== null && v !== undefined && v !== "");
+
+  const hasProfile = profile.length > 0 || (app.skills?.length ?? 0) > 0;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -49,7 +70,9 @@ export default function ApplicantModal({ app, onClose }) {
         <div className="modal-hdr">
           <div>
             <div style={{ fontFamily: "'Fraunces',serif", fontWeight: 700, fontSize: 18, color: "#1a1612" }}>{app.name}</div>
-            <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 2 }}>{app.email}</div>
+            <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 2 }}>
+              {app.email}{app.phone ? ` · ${app.phone}` : ""}
+            </div>
             {app.shortlisted && (
               <span style={{ display: "inline-block", marginTop: 6, padding: "2px 10px", borderRadius: 20, background: "#22c55e", color: "#fff", fontSize: 11, fontWeight: 700 }}>
                 Shortlisted
@@ -64,7 +87,7 @@ export default function ApplicantModal({ app, onClose }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
             {[
               ["Applied", fmtDate(app.appliedDate)],
-              ["Portal", portal.label || app.portal],
+              ["Portal", portalLabel],
               ["AI Score", `${app.score ?? "\u2014"}/100`],
             ].map(([k, v]) => (
               <div key={k} style={{ background: "#faf8f5", borderRadius: 9, padding: "10px 14px" }}>
@@ -73,6 +96,40 @@ export default function ApplicantModal({ app, onClose }) {
               </div>
             ))}
           </div>
+
+          {/* Candidate-supplied profile \u2014 /apply.html submissions only. */}
+          {hasProfile && (
+            <div style={{ marginBottom: 18, padding: 14, background: "#faf8f5", borderRadius: 10, border: "1px solid #e8e2d9" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#5a5048", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
+                Candidate profile
+                {app.portal === "form" && (
+                  <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "#c97a2a", background: "rgba(201,122,42,0.10)", padding: "2px 8px", borderRadius: 20, textTransform: "none", letterSpacing: 0 }}>
+                    self-reported
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: "10px 16px" }}>
+                {profile.map(([k, v]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 10.5, color: "#8a7e72", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px" }}>{k}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1612", marginTop: 2 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              {app.skills?.length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 10.5, color: "#8a7e72", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: 6 }}>Skills</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {app.skills.map((s, i) => (
+                      <span key={`${s}-${i}`} style={{ background: "#fdf3e3", border: "1px solid #f0dcb8", color: "#8a6a2a", borderRadius: 20, padding: "3px 11px", fontSize: 12, fontWeight: 600 }}>
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {app.screening_notes && (
             <div style={{ marginBottom: 18, padding: 12, background: "#faf8f5", borderRadius: 10, border: "1px solid #e8e2d9" }}>

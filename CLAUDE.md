@@ -28,6 +28,7 @@ there**, or it builds locally and 404s in production.
 | `/attend.html` | `src/attend-main.jsx` | Employee attendance portal (Hub login required) |
 | `/test.html` | `src/test-main.jsx` | **Walk-in assessment, level 1 — no login at all** |
 | `/test2.html` | `src/test2-main.jsx` | **Walk-in assessment, level 2 (role-specific) — no login** |
+| `/apply.html` | `src/apply-main.jsx` | **Candidate application form — no login at all** |
 
 ### Navigation
 
@@ -203,6 +204,74 @@ override row the view honours. Sidebar → Employee Management → **Attendance 
   (the view LEFT JOINs the table with top precedence and still emits inside the coverage gap).
 - Same job as the "close a month as UL" migration, but interactive and per-day. Bulk
   month-close stays a migration; ad-hoc single-day fixes use this.
+
+---
+
+## The candidate application form (built 31 Aug 2026)
+
+A shareable public link a candidate fills in themselves. **No login.** The
+submission lands in `hr.applicants` at stage `new`, so it shows up in the
+Kanban board HR already works from — there is deliberately no second inbox.
+
+**Share this URL:** `https://hr-hiring-automation.vercel.app/apply.html`
+
+| Piece | Path |
+|---|---|
+| Candidate page | `apply.html` → `src/components/apply/ApplyForm.jsx` + `.css` |
+| Mount | `src/apply-main.jsx` |
+| API client | `src/services/applyApi.js` |
+| Server | `supabase/functions/apply/index.ts` (single action `submit`) |
+| Migration | `20260831120000_hr_applicant_self_apply_form.sql` |
+| Where HR reads it | Applicants Kanban → click a card (`ApplicantModal.jsx`, "Candidate profile" block) |
+
+Fields: Full Name\*, Email\*, Phone\*, Designation\*, Department, Location,
+Industry, Total experience\*, Skills, Current CTC, Notice period, Expected CTC.
+
+### Things that will bite
+
+- **Email and phone were not in the original field list; they are required
+  anyway.** `hr.applicants.email` is `NOT NULL` and is the duplicate key, and a
+  candidate record with no way to contact the candidate is not a lead. If the
+  requirement really is an anonymous talent survey, that is a different
+  instrument — do not loosen this one.
+- **`job_id` is now nullable and a form submission leaves it NULL.** The
+  candidate applied to a *designation* they typed, not to a `hr.jobs` row. The
+  rejected alternative was auto-creating a job per designation, which fills the
+  Jobs panel with near-duplicate one-off roles ("Sr. Interior Dsgnr",
+  "interior designer") that then get merged by hand. HR attaches the person to a
+  real opening from the Kanban. **The card falls back to `designation`** for its
+  subtitle — without that every form submission renders as "Unknown role".
+- **`portal = 'form'`, not `'manual'`.** `manual` means an HR person keyed it in.
+  The difference is load-bearing: a self-reported CTC is the candidate's claim,
+  a manual one was heard on a call. The modal labels the block *self-reported*
+  for exactly that reason. Adding `'form'` meant widening
+  `applicants_portal_check` — a new source always does.
+- **`SOURCE_META` and `PORTALS` are different lists.** `PORTALS` is only the six
+  boards we post jobs to; `SOURCE_META` is every source a candidate can arrive
+  from. `ApplicantModal` now falls through `PORTALS → SOURCE_META → raw string`,
+  because before this it rendered the bare id for `manual`, `whatsapp` and `form`.
+- **Anon still gets nothing.** Same shape as `assessment`: RLS on, no anon
+  policy, no anon grant, every write through the service-role edge function.
+  Verified after deploy — an anon `POST /rest/v1/applicants` returns
+  `42501 new row violates row-level security policy`. Do not add an anon policy.
+  (Note `anon` does hold table *grants* on `hr.applicants` — pre-existing, and
+  RLS is the only thing refusing it. Worth revoking; it is not this feature's
+  doing.)
+- **Duplicate submits are answered, not inserted.** One row per email address,
+  checked by the function on every submit (hence the `lower(email)` index). It is
+  deliberately **not** a unique constraint: HR legitimately keys in a second row
+  for someone reapplying a year later, and a constraint would blow up inside the
+  Quick Add modal with a raw Postgres error.
+- **Spam controls are cheap and known to be cheap**: one row per email, an
+  off-screen `company_website` honeypot (answered `200 OK` so bots don't retry),
+  and hard length caps before anything reaches Postgres. If the board is ever
+  actually flooded the fix is a captcha, not more heuristics in `index.ts`.
+- **No resume upload.** Which means `resume_text` is empty, which means
+  **`screenApplicant` cannot AI-score a form submission** — the card reads "Not
+  screened" until HR attaches a resume. That is a known gap, not a bug.
+- Department / Industry / Notice period are `<datalist>` **suggestions, not
+  whitelists**. A public form that rejects a real job title because it is not on
+  our list is worse than a slightly messy column.
 
 ---
 ## Access model — 3 roles (built 27 Aug 2026)

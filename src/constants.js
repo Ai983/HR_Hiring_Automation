@@ -65,6 +65,10 @@ export const SOURCE_META = {
   facebook:  { label: "Facebook",  color: "#1877f2", bg: "rgba(24,119,242,0.10)" },
   instagram: { label: "Instagram", color: "#e1306c", bg: "rgba(225,48,108,0.10)" },
   manual:    { label: "Manual",    color: "#8a7e72", bg: "rgba(138,126,114,0.10)"},
+  // Candidate filled in /apply.html themselves. Kept distinct from "manual"
+  // on purpose: a self-reported CTC is a claim, a manual one was heard on a
+  // call, and the badge has to say which.
+  form:      { label: "Self-applied", color: "#c97a2a", bg: "rgba(201,122,42,0.10)" },
 };
 
 export const SURVEY_SOURCES = [

@@ -57,6 +57,7 @@ export default defineConfig({
         attend: path.join(__dirname, "attend.html"),
         test:   path.join(__dirname, "test.html"),
         test2:  path.join(__dirname, "test2.html"),
+        apply:  path.join(__dirname, "apply.html"),
       },
     },
   },
