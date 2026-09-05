@@ -11,6 +11,16 @@ const OVERLAY = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", z
 const MODAL = { background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 500, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" };
 const PORTAL_LIST = ["manual", "linkedin", "indeed", "jobhai", "apna", "email", "whatsapp", "facebook", "instagram"];
 
+// The candidate-facing application form (`/apply.html`). Resolved the same way
+// emailService.js resolves its link target: VITE_HUB_URL when the admin app and
+// the public pages are on different hosts, otherwise the current origin. Never
+// hardcode the vercel.app domain — a link copied while testing on localhost
+// would then silently point real candidates at production, or vice versa.
+const APPLY_URL = `${
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_HUB_URL) ||
+  (typeof window !== "undefined" ? window.location.origin : "")
+}/apply.html`;
+
 export default function Applicants() {
   const { jobs, setJobs, applicants, setApplicants, refreshApplicants, selectedJob, setSelectedJob, setModal, setPanel, showToast } = useApp();
 
@@ -144,19 +154,65 @@ export default function Applicants() {
 
   const setResumeModal = (val) => setModal(val ? { type: "resumeUpload", data: val } : null);
 
+  // Copy the public form link so HR can paste it into WhatsApp or an email.
+  // navigator.clipboard needs a secure context and is not there on every
+  // browser the office uses, so the textarea fallback is not optional —
+  // without it the button looks like it did nothing.
+  const copyApplyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(APPLY_URL);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = APPLY_URL;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    showToast("Application form link copied — paste it into WhatsApp or email.");
+  };
+
   return (
     <div className="fade-in">
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
         <div>
           <div className="page-title">Applicants</div>
-          <div className="page-sub">Drag cards to move stages · Click a card to view · + on a column to add directly</div>
+          <div className="page-sub">
+            Drag cards to move stages · Click a card to view · + on a column to add directly
+          </div>
+          <div className="page-sub" style={{ marginTop: 4 }}>
+            Candidates can apply themselves at{" "}
+            <code style={{ fontSize: 12 }}>/apply.html</code> — submissions arrive in{" "}
+            <b>New</b> tagged <b>Self-applied</b>.
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <select className="form-input" style={{ width: 220 }} value={selectedJob || ""} onChange={(e) => setSelectedJob(e.target.value || null)}>
             <option value="">All Jobs</option>
             {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
           </select>
+          {/* The public form link. It lives here rather than on the Dashboard
+              because this is the panel HR is on when they are thinking about
+              candidates — and it is where the submissions land. */}
+          <button
+            className="btn-outline"
+            style={{ fontSize: 12 }}
+            onClick={copyApplyLink}
+            title={`Copy ${APPLY_URL}`}
+          >
+            🔗 Copy form link
+          </button>
+          <a
+            className="btn-outline"
+            style={{ fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+            href={APPLY_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="Open the candidate form in a new tab"
+          >
+            Preview
+          </a>
           <button className="btn-outline" style={{ fontSize: 12 }} onClick={() => openQuickAdd("new")}>+ Add Applicant</button>
           <button className="btn-gold" onClick={() => setResumeModal(selectedJob ? { jobId: selectedJob } : { jobId: "" })}>
             + Upload resume

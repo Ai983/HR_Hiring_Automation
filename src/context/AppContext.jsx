@@ -18,6 +18,10 @@ export function AppProvider({ children }) {
     return new URLSearchParams(window.location.search).get("panel") || "dashboard";
   });
   const [selectedJob, setSelectedJob] = useState(null);
+  // Which policy section the Policies panel should open on. Set by the
+  // dashboard's HR Policy cards so "Leave Policy" lands on Leave Policy
+  // rather than on whatever tab was open last. Same pattern as selectedJob.
+  const [policyCategory, setPolicyCategory] = useState(null);
   const [modal, setModal] = useState(null);
   const [loading, setLoading] = useState(false);
   const { toast, showToast } = useToast();
@@ -87,6 +91,7 @@ export function AppProvider({ children }) {
     refreshApplicants,
     panel, setPanel,
     selectedJob, setSelectedJob,
+    policyCategory, setPolicyCategory,
     modal, setModal,
     loading,
     toast, showToast,

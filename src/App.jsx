@@ -29,11 +29,27 @@ import SurveyLeads from "./components/panels/SurveyLeads.jsx";
 import AssessmentResults from "./components/panels/AssessmentResults.jsx";
 import QuestionBank from "./components/panels/QuestionBank.jsx";
 import AttendanceRegularize from "./components/panels/AttendanceRegularize.jsx";
+import Policies from "./components/panels/Policies.jsx";
+import Performance from "./components/panels/Performance.jsx";
 import ApplicantModal from "./components/modals/ApplicantModal.jsx";
 import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 
-// Which module each panel belongs to.
-const HIRING = new Set(["dashboard", "jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment", "questionbank"]);
+// Panels that belong to no single module — anyone with a Hub login and any
+// module at all may open them.
+//
+//   dashboard   — it is the front door and now carries the Employee
+//                 Management and HR Policy sections too. Gating it on
+//                 `hireflow` (as it was) meant an attendance-only employee
+//                 landed on "You don't have access to this section" at the
+//                 one URL everybody opens first.
+//   policies    — company policy is company-wide by definition. A policy
+//                 only the hiring team can read is not published.
+//   performance — RLS returns an employee only their own review, so the
+//                 panel is safe to open for everyone; HR sees the cycles.
+const COMMON = new Set(["dashboard", "policies", "performance"]);
+
+// Which module each of the rest belongs to.
+const HIRING = new Set(["jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment", "questionbank"]);
 export const moduleForPanel = (p) => (HIRING.has(p) ? "hireflow" : "attendance");
 
 // Panels only a super_admin may open at all — not even read-only.
@@ -85,7 +101,7 @@ function AppContent() {
   if (!ctx) return <NoAccess msg="Your login isn't linked to an employee record yet. Contact HR." />;
   if (!hasModule("hireflow") && !hasModule("attendance")) return <NoAccess msg="You don't have access to HireFlow. Ask an admin to grant the hireflow or attendance module." />;
 
-  const allowed = hasModule(moduleForPanel(panel))
+  const allowed = (COMMON.has(panel) || hasModule(moduleForPanel(panel)))
     && (!SUPER_ONLY.has(panel) || !!ctx.is_super_admin);
 
   return (
@@ -128,6 +144,8 @@ function AppContent() {
               {panel === "leave"        && <LeaveRequests />}
               {panel === "regularize"   && <AttendanceRegularize />}
               {panel === "employees"    && <EmployeeManagement />}
+              {panel === "policies"     && <Policies />}
+              {panel === "performance"  && <Performance />}
             </>
           )}
         </main>

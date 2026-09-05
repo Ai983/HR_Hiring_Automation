@@ -33,9 +33,27 @@ there**, or it builds locally and 404s in production.
 ### Navigation
 
 There is no router. `panel` is a string in `src/context/AppContext.jsx`, switched
-by `{panel === "x" && <X/>}` in `src/App.jsx`. A new panel needs three edits:
-the import + line in `App.jsx`, the `HIRING` set in `App.jsx` (module gating),
-and the group in `src/components/layout/Sidebar.jsx`.
+by `{panel === "x" && <X/>}` in `src/App.jsx`.
+
+**`src/navigation.js` is the single definition of the nav.** Both the sidebar
+and the dashboard render from `buildNav()` — the dashboard exists to put every
+page one click away, so the two lists have to agree, and two lists that "look
+the same" drift the moment somebody adds a panel to one of them. Do not
+re-list panels in either component.
+
+A new panel needs three edits: the import + line in `App.jsx`, its module in
+`App.jsx` (`COMMON` for everyone, else the `HIRING` set), and an item in the
+right group in `navigation.js`.
+
+- `item.panel` is what gets written to `panel`; `item.id` is only a React key.
+  They differ for the four **HR Policy** entries, which all open the `policies`
+  panel and vary only by `item.category`.
+- `group.module: null` means "anyone signed in" (HR Policy, Performance).
+- `COMMON` in `App.jsx` is panels with no module gate. **`dashboard` is in it.**
+  It used to be gated on `hireflow`, which meant an attendance-only employee
+  hit "You don't have access to this section" at the one URL everyone opens
+  first — and it now carries the Employee Management and HR Policy sections
+  anyway.
 
 ### Layering
 
@@ -223,6 +241,7 @@ Kanban board HR already works from — there is deliberately no second inbox.
 | Server | `supabase/functions/apply/index.ts` (single action `submit`) |
 | Migration | `20260831120000_hr_applicant_self_apply_form.sql` |
 | Where HR reads it | Applicants Kanban → click a card (`ApplicantModal.jsx`, "Candidate profile" block) |
+| Where HR **gets the link** | Applicants panel header → **Copy form link** / **Preview** |
 
 Fields: Full Name\*, Email\*, Phone\*, Designation\*, Department, Location,
 Industry, Total experience\*, Skills, Current CTC, Notice period, Expected CTC.
@@ -269,9 +288,75 @@ Industry, Total experience\*, Skills, Current CTC, Notice period, Expected CTC.
 - **No resume upload.** Which means `resume_text` is empty, which means
   **`screenApplicant` cannot AI-score a form submission** — the card reads "Not
   screened" until HR attaches a resume. That is a known gap, not a bug.
+- **The link is built from `VITE_HUB_URL || window.location.origin`, never
+  hardcoded** (`APPLY_URL` in `Applicants.jsx`, same resolution as
+  `emailService.js`). Hardcoding the vercel.app domain means a link copied while
+  testing on localhost sends real candidates to production — or, worse, the
+  reverse. The copy button keeps the textarea fallback because
+  `navigator.clipboard` needs a secure context and is absent on some office
+  browsers; without it the button silently does nothing.
 - Department / Industry / Notice period are `<datalist>` **suggestions, not
   whitelists**. A public form that rejects a real job title because it is not on
   our list is worse than a slightly messy column.
+
+---
+
+## HR policy library + Performance management (built 5 Sep 2026)
+
+Two new panels, plus a dashboard rebuilt as the front door — every page in the
+sidebar is now one click away from it, grouped **Hire / Employee Management /
+Performance Management / HR Policy**.
+
+| Piece | Path |
+|---|---|
+| **Shared nav definition** | `src/navigation.js` (sidebar + dashboard both read it) |
+| Dashboard | `src/components/panels/Dashboard.jsx` |
+| Policy panel | `src/components/panels/Policies.jsx` |
+| Policy service | `src/services/policyService.js` |
+| Performance panel | `src/components/panels/Performance.jsx` |
+| Performance service | `src/services/performanceService.js` |
+| Migrations | `20260905120000_hr_policy_library.sql`, `20260905130000_hr_performance_management.sql` |
+
+### Things that will bite
+
+- **Policies are readable by EVERY authenticated user.** That is deliberate and
+  is the whole point — a policy only the hiring team can read is not published.
+  Writes are `hr.is_hr_admin()`. Verified by simulating both JWTs in SQL: an
+  `employee` reads policies and is **blocked** from inserting one.
+- **The `hr-policies` bucket is PRIVATE**, unlike `resumes` and `selfies` which
+  are public (anyone with the URL, no login). A ZTP or leave policy names
+  disciplinary process and entitlements — a public URL is one forward away from
+  being outside the company. Downloads go through `createSignedUrl` (5 min),
+  the same shape as `offer-letters`.
+- **`window.open` before the `await`, not after.** A signed URL is fetched
+  asynchronously; opening the tab afterwards trips the popup blocker, which
+  reads to the user as "the download button is broken".
+- **This is a SHARED hub project** — cps, lcs, delegation and expense keep
+  objects in the same `storage.objects` table. Every policy in the migration is
+  scoped to `bucket_id = 'hr-policies'` and **must stay that way**; an unscoped
+  storage policy hands our rules to another product's files.
+- **Upload writes the file first, then the row.** Reversed, a failed upload
+  leaves a listed policy that 404s when clicked — the worst failure here,
+  because it looks published. A failed insert cleans up the object it uploaded.
+- **Archive, don't delete.** `is_active = false` keeps the record of what was in
+  force and when. Delete is there for a mistaken upload only, and says so in
+  the confirm dialog.
+- **A performance review is readable by its own employee or hr_admin — nobody
+  else.** Verified: with two reviews in a cycle, an employee JWT sees exactly
+  one. Do not widen that select policy.
+- **Ratings are `numeric(2,1)`, 1.0–5.0, NULL for "not rated".** Never 0 — zero
+  reads as the worst possible score in every average. `averageRating()` skips
+  nulls and returns `null`, not `0`, when nothing is rated.
+- **`final_rating` never defaults from the manager rating.** A final rating is a
+  decision someone makes, not an arithmetic result.
+- **Performance is deliberately minimal.** No KRA weighting, no 360 feedback, no
+  calibration, no increment workflow, and `goals` is free text on purpose so it
+  does not pretend to a structure nobody has agreed. Hagerstone's appraisal
+  process has not been specified to us; inventing five tables of it would mean
+  HR working around a process we made up. The cycle/review split survives
+  almost any real design, so extend rather than rebuild.
+- **`anon` is revoked at grant level** on all three tables, not merely blocked
+  by RLS — stricter than `hr.applicants`, which relies on RLS alone.
 
 ---
 ## Access model — 3 roles (built 27 Aug 2026)

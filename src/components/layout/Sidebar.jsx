@@ -5,10 +5,11 @@ import { supabase } from "../../supabaseClient.js";
 import { fetchSurveyNewCount } from "../../services/surveyService.js";
 import { fetchPendingLeaveCount } from "../../services/leaveService.js";
 import { fetchTodaySubmittedCount } from "../../services/assessmentService.js";
+import { buildNav, visibleGroups } from "../../navigation.js";
 import SyncStatus from "./SyncStatus.jsx";
 
 export default function Sidebar() {
-  const { panel, setPanel, jobs, applicants, setSelectedJob, ctx, hasModule, logout } = useApp();
+  const { panel, setPanel, jobs, applicants, setSelectedJob, setPolicyCategory, ctx, hasModule, logout } = useApp();
   const canRegularize = !!ctx?.is_super_admin;
   const [surveyCount, setSurveyCount] = useState(0);
   const [leaveCount, setLeaveCount]   = useState(0);
@@ -36,60 +37,37 @@ export default function Sidebar() {
 
   const topItem = { id: "dashboard", icon: "⬛", label: "Dashboard" };
 
-  const groups = [
-    {
-      id: "grp-onboarding",
-      icon: "\u{1F9ED}",
-      label: "Onboarding",
-      items: [
-        { id: "jobs",          icon: "≡", label: "All Jobs",        badge: liveJobs },
-        { id: "applicants",    icon: "◎", label: "Applicants",      badge: newApps },
-        { id: "survey",        icon: "📋", label: "Survey Leads",    badge: surveyCount },
-        { id: "assessment",    icon: "\u{1F9EE}", label: "Assessment",     badge: assessCount },
-        { id: "questionbank",  icon: "\u{1F4DA}", label: "Question Bank" },
-        { id: "calling",       icon: "☎", label: "Calling Queue",   badge: callingQ },
-        { id: "interviews",    icon: "\u{1F4C5}", label: "Interviews",    badge: interviews },
-        { id: "reference",     icon: "✅", label: "Reference Check", badge: references },
-        { id: "offers",        icon: "\u{1F4DD}", label: "Offer Letters", badge: offers },
-        { id: "onboarding",    icon: "\u{1F3E0}", label: "Onboarding",    badge: onboardings },
-        { id: "documents",     icon: "\u{1F4C4}", label: "Documents" },
-        { id: "questionnaire", icon: "❓", label: "Questionnaire" },
-        { id: "report",        icon: "☰", label: "Resume Report" },
-      ],
-    },
-    {
-      id: "grp-employees",
-      icon: "\u{1F465}",
-      label: "Employee Management",
-      items: [
-        { id: "today",         icon: "\u{1F4C6}", label: "Today" },
-        { id: "attendance",    icon: "⏰", label: "Attendance" },
-        { id: "weekly",        icon: "\u{1F5D3}", label: "Weekly Report" },
-        { id: "monthly",       icon: "\u{1F4CA}", label: "Monthly Report" },
-        { id: "officeteam",    icon: "\u{1F3E2}", label: "Office Team" },
-        { id: "attsetup",      icon: "⚙", label: "Attendance Setup" },
-        { id: "location",      icon: "\u{1F4CD}", label: "Location Tracking" },
-        { id: "geofence",      icon: "\u{1F5FA}", label: "Geofence Sites" },
-        { id: "leave",         icon: "\u{1F334}", label: "Leave Requests", badge: leaveCount },
-        ...(canRegularize ? [{ id: "regularize", icon: "✎", label: "Attendance Fix" }] : []),
-        { id: "employees",     icon: "▦", label: "Employees" },
-      ],
-    },
-  ];
+  // Single source of truth, shared with the dashboard — see navigation.js.
+  const groups = visibleGroups(
+    buildNav({
+      canRegularize,
+      badges: {
+        jobs: liveJobs, applicants: newApps, survey: surveyCount,
+        assessment: assessCount, calling: callingQ, interviews,
+        reference: references, offers, onboarding: onboardings,
+        leave: leaveCount,
+      },
+    }),
+    hasModule
+  );
 
   const groupForPanel = (p) =>
-    groups.find((g) => g.items.some((it) => it.id === p))?.id ?? null;
+    groups.find((g) => g.items.some((it) => it.panel === p))?.id ?? null;
 
-  const [openGroup, setOpenGroup] = useState(groupForPanel(panel) ?? "grp-onboarding");
+  const [openGroup, setOpenGroup] = useState(groupForPanel(panel) ?? "grp-hire");
 
   useEffect(() => {
     const g = groupForPanel(panel);
     if (g) setOpenGroup(g);
   }, [panel]);
 
-  const goTo = (id) => {
-    setPanel(id);
-    if (id !== "applicants") setSelectedJob(null);
+  const goTo = (item) => {
+    // `item` is either a nav entry or the bare dashboard item. Policy entries
+    // all open the same panel and differ only by which section they land on.
+    const target = typeof item === "string" ? { panel: item } : item;
+    if (target.category) setPolicyCategory(target.category);
+    setPanel(target.panel);
+    if (target.panel !== "applicants") setSelectedJob(null);
   };
 
   return (
@@ -101,17 +79,15 @@ export default function Sidebar() {
         </div>
       </div>
       <nav className="sidebar-nav">
-        {hasModule("hireflow") && (
-          <button
-            className={`nav-item ${panel === topItem.id ? "active" : ""}`}
-            onClick={() => goTo(topItem.id)}
-          >
-            <span className="nav-icon">{topItem.icon}</span>
-            {topItem.label}
-          </button>
-        )}
+        <button
+          className={`nav-item ${panel === topItem.id ? "active" : ""}`}
+          onClick={() => goTo(topItem.id)}
+        >
+          <span className="nav-icon">{topItem.icon}</span>
+          {topItem.label}
+        </button>
 
-        {groups.filter((group) => hasModule(group.id === "grp-onboarding" ? "hireflow" : "attendance")).map((group) => {
+        {groups.map((group) => {
           const open = openGroup === group.id;
           return (
             <div key={group.id} className="nav-group">
@@ -129,8 +105,8 @@ export default function Sidebar() {
                   {group.items.map((item) => (
                     <button
                       key={item.id}
-                      className={`nav-item ${panel === item.id ? "active" : ""}`}
-                      onClick={() => goTo(item.id)}
+                      className={`nav-item ${panel === item.panel ? "active" : ""}`}
+                      onClick={() => goTo(item)}
                     >
                       <span className="nav-icon">{item.icon}</span>
                       {item.label}
