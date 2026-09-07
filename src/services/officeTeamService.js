@@ -1,22 +1,42 @@
 import { supabase } from "../supabaseClient.js";
 
-// Data access for the EA's Office Team attendance report.
+// Data access for the team attendance report.
 //
-// "Office team" is hr.employee_profile.office_team, a stored flag, NOT a query
-// over who punched recently. Derived membership drops anyone away for a
-// fortnight, and two of the fifteen (Yash Kumar Sharma, Bipin Jha) had not
-// punched on the portal at all when the report was built. The EA maintains the
-// list from the panel.
+// Membership is DERIVED, per month: everyone who actually recorded attendance
+// in the month being viewed, office and site alike. It was a stored flag
+// (hr.employee_profile.office_team) curated by the EA until 2026-09-07, which
+// silently excluded site staff — two site engineers onboarded that morning
+// punched in and never appeared. Requested change: the sheet covers whoever is
+// putting attendance into the system.
+//
+// The known cost of deriving it, which the stored flag existed to avoid:
+// someone with NO record at all in a month drops off the sheet entirely rather
+// than showing as absent. That is why `office_team` is still written and read
+// nowhere else — restoring the curated list is a one-function change.
 //
 // Panels never touch supabase directly — everything goes through here.
 
-/** The office team, in report order. */
-export async function fetchOfficeTeam() {
-  if (!supabase) return [];
+/** Everyone who recorded attendance in `month`, in report order.
+ *
+ *  Roster people are excluded: they have no login and never punch, and the
+ *  ~60 imported sheet names belong to Monthly Report, not this sheet. */
+export async function fetchOfficeTeam(month) {
+  if (!supabase || !month) return [];
+  // One row per person per month, so this is the distinct list already.
+  const { data: months, error: monthErr } = await supabase
+    .from("attendance_month")
+    .select("subject_id")
+    .eq("month", month);
+  if (monthErr) throw monthErr;
+
+  const ids = [...new Set((months || []).map((m) => m.subject_id))];
+  if (!ids.length) return [];
+
   const { data, error } = await supabase
     .from("attendance_subject")
     .select("*")
-    .eq("office_team", true)
+    .in("subject_id", ids)
+    .eq("subject_kind", "employee")
     .eq("is_active", true)
     .order("full_name", { ascending: true });
   if (error) throw error;
@@ -64,18 +84,33 @@ export async function fetchOfficeTeamMonth(month, subjectIds) {
   return data || [];
 }
 
-/** Every day row for a set of people across one month. */
+/** Every day row for a set of people across one month.
+ *
+ *  Paged deliberately. PostgREST caps a response at max-rows (1000 here), and
+ *  the derived team is far larger than the fifteen this was written for — one
+ *  month for ~66 people is ~2,000 rows. An unpaged read does not error, it just
+ *  stops, and the people sorted last quietly lose their days. Ordering by
+ *  subject then date keeps each person's rows contiguous and in date order
+ *  across page boundaries. */
 export async function fetchOfficeTeamDays({ subjectIds, from, to }) {
   if (!supabase || !subjectIds?.length) return [];
-  const { data, error } = await supabase
-    .from("attendance_day")
-    .select("*")
-    .in("subject_id", subjectIds)
-    .gte("work_date", from)
-    .lte("work_date", to)
-    .order("work_date", { ascending: true });
-  if (error) throw error;
-  return data || [];
+  const PAGE = 1000;
+  const out = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from("attendance_day")
+      .select("*")
+      .in("subject_id", subjectIds)
+      .gte("work_date", from)
+      .lte("work_date", to)
+      .order("subject_id", { ascending: true })
+      .order("work_date", { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+  return out;
 }
 
 /** Remarks for the month, so the report's Remarks column is not always blank. */

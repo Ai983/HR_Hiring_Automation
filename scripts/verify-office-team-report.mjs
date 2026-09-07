@@ -76,6 +76,32 @@ async function q(table, query, schema = "hr") {
   return res.json();
 }
 
+// PostgREST caps every response at 1000 rows and IGNORES a larger `limit=` —
+// it does not error, it just stops. A month of day rows for the whole team is
+// well past that, so anything unbounded has to be paged with Range or it reads
+// as "those people had no attendance". Mirrors fetchOfficeTeamDays.
+async function qAll(table, query, schema = "hr") {
+  const PAGE = 1000;
+  const out = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const res = await fetch(`${URL_}/rest/v1/${table}?${query}`, {
+      headers: {
+        apikey: KEY, Authorization: `Bearer ${KEY}`, "Accept-Profile": schema,
+        Range: `${offset}-${offset + PAGE - 1}`, "Range-Unit": "items",
+      },
+    });
+    if (!res.ok) throw new Error(`${table}: ${res.status} ${await res.text()}`);
+    const page = await res.json();
+    out.push(...page);
+    if (page.length < PAGE) return out;
+  }
+}
+
+const monthEndOf = (iso) => {
+  const [y, m] = iso.split("-").map(Number);
+  return `${iso.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+};
+
 let failures = 0;
 const check = (label, got, want) => {
   const ok = got === want || (typeof got === "number" && typeof want === "number" && Math.abs(got - want) < 0.005);
@@ -83,19 +109,33 @@ const check = (label, got, want) => {
   else console.log(`  ok    ${label} = ${JSON.stringify(got)}`);
 };
 
-// ── 1. The office team is what the migration says it is ─────────────────────
-console.log("\n[1] office team membership");
-const team = await q("attendance_subject", "select=*&office_team=is.true&is_active=is.true&order=full_name");
-// NOT a fixed count: the EA adds and removes people from the panel's Manage
-// team dialog, so hardcoding a number here just breaks the test every time she
-// uses the feature as intended. What must hold is that the list is non-empty
-// and that everyone on it can actually punch.
-check("office team is populated", team.length > 0, true);
-console.log(`        ${team.length} people`);
+// ── 1. Membership = whoever recorded attendance that month ──────────────────
+// Mirrors officeTeamService.fetchOfficeTeam. Membership stopped being the
+// stored office_team flag on 2026-09-07 — it is derived per month, so that
+// site staff appear alongside office staff instead of being silently absent
+// from the sheet. NOT a fixed count: it moves as people punch.
+const TEAM_MONTH = "2026-08-01";
+console.log(`\n[1] membership — recorded attendance in ${TEAM_MONTH}`);
+const monthRows = await q("attendance_month", `select=subject_id&month=eq.${TEAM_MONTH}`);
+const memberIds = [...new Set(monthRows.map((m) => m.subject_id))];
+const team = memberIds.length
+  ? await q("attendance_subject",
+      `select=*&subject_id=in.(${memberIds.join(",")})&subject_kind=eq.employee&is_active=is.true&order=full_name`)
+  : [];
+check("membership is populated", team.length > 0, true);
+console.log(`        ${team.length} people (of ${memberIds.length} subjects with data)`);
 const codes = team.map((t) => t.employee_code || `(${t.full_name})`).join(", ");
 console.log(`        ${codes}`);
+// Roster names have no login and can never punch; they belong to Monthly
+// Report, not this sheet. The filter above excludes them — assert it held.
 for (const t of team) {
   if (t.subject_kind !== "employee") { failures++; console.log(`  FAIL  ${t.full_name} is a roster person, cannot punch`); }
+}
+// Everyone listed must genuinely have data for the month, which is the whole
+// premise of deriving the list.
+const memberSet = new Set(memberIds);
+for (const t of team) {
+  if (!memberSet.has(t.subject_id)) { failures++; console.log(`  FAIL  ${t.full_name} has no ${TEAM_MONTH} attendance`); }
 }
 
 // ── 2. The coverage gap is genuinely closed ─────────────────────────────────
@@ -103,8 +143,8 @@ console.log("\n[2] coverage gap 2026-07-31 .. 2026-08-11");
 const [settings] = await q("attendance_settings", "select=*&id=is.true");
 check("coverage_gap_from cleared", settings.coverage_gap_from, null);
 check("late_after", String(settings.late_after).slice(0, 5), "09:40");
-const gapDays = await q("attendance_day",
-  "select=work_date,day_status&work_date=gte.2026-07-31&work_date=lte.2026-08-11&limit=2000");
+const gapDays = await qAll("attendance_day",
+  "select=work_date,day_status&work_date=gte.2026-07-31&work_date=lte.2026-08-11&order=subject_id,work_date");
 check("gap has day rows", gapDays.length > 300, true);
 const gapWorked = gapDays.filter((d) => d.day_status === "present" || d.day_status === "late").length;
 console.log(`        ${gapDays.length} day rows, ${gapWorked} worked, ` +
@@ -214,15 +254,15 @@ console.log(`        footer: ${footerLine(report)}`);
 // ── 7. Every office-team person exports without blowing up ──────────────────
 console.log("\n[7] whole-team workbook");
 const ids = team.map((t) => t.subject_id);
-const allMonths = await q("attendance_month", `select=*&month=eq.2026-08-01&subject_id=in.(${ids.join(",")})`);
-const allDays = await q("attendance_day",
-  `select=*&subject_id=in.(${ids.join(",")})&work_date=gte.2026-08-01&work_date=lte.2026-08-31&limit=2000`);
+const allMonths = await q("attendance_month", `select=*&month=eq.${TEAM_MONTH}&subject_id=in.(${ids.join(",")})`);
+const allDays = await qAll("attendance_day",
+  `select=*&subject_id=in.(${ids.join(",")})&work_date=gte.${TEAM_MONTH}&work_date=lte.${monthEndOf(TEAM_MONTH)}&order=subject_id,work_date`);
 const dayBy = new Map();
 for (const d of allDays) (dayBy.get(d.subject_id) ?? dayBy.set(d.subject_id, []).get(d.subject_id)).push(d);
 const sumBy = new Map(allMonths.map((s) => [s.subject_id, s]));
 const reports = team.map((s) => buildReport({
   subject: s, summary: sumBy.get(s.subject_id) || null,
-  days: dayBy.get(s.subject_id) || [], remarks: [], settings, month: "2026-08-01",
+  days: dayBy.get(s.subject_id) || [], remarks: [], settings, month: TEAM_MONTH,
 }));
 const teamFile = await buildWorkbook({ reports });
 const teamOut = path.join(os.tmpdir(), teamFile.filename);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import {
-  fetchOfficeTeam, fetchAssignableSubjects, setOfficeTeam,
+  fetchOfficeTeam,
   fetchOfficeTeamMonth, fetchOfficeTeamDays, fetchOfficeTeamRemarks,
   monthOptions, monthLabel, monthEnd,
 } from "../../services/officeTeamService.js";
@@ -9,12 +9,14 @@ import { fetchAttendanceSettings } from "../../services/attendanceService.js";
 import { buildReport } from "../../services/officeTeamReport.js";
 import { buildWorkbook, download } from "../../services/officeTeamExcel.js";
 
-// The EA's Office Team report. One month sheet per person, in the same layout
+// The team attendance report. One month sheet per person, in the same layout
 // as the printed HSIPL month sheet, downloadable as a real .xlsx.
 //
-// Distinct from Monthly Report (which covers everyone, including the ~60
-// imported roster names with no hub login) — this is the fifteen office staff
-// who punch on the portal, which is the list the EA actually circulates.
+// Covers everyone who recorded attendance in the selected month — office and
+// site staff alike. Membership is derived per month in officeTeamService, not
+// curated: see the note there for what that costs and how to put the curated
+// list back. Still distinct from Monthly Report, which also carries the ~60
+// imported roster names that have no hub login and never punch.
 
 const CELL = { padding: "7px 8px", fontSize: 12, borderBottom: "1px solid #f0ece5", textAlign: "center" };
 const TH   = { padding: "9px 8px", fontSize: 10, fontWeight: 700, textTransform: "uppercase",
@@ -122,84 +124,6 @@ function MonthSheet({ report, onClose, onDownload, busy }) {
   );
 }
 
-// ─── Add / remove people ─────────────────────────────────────────────────────
-
-function ManageTeam({ team, onClose, onChanged }) {
-  const { showToast } = useApp();
-  const [all, setAll] = useState(null);
-  const [q, setQ] = useState("");
-  const [saving, setSaving] = useState("");
-
-  useEffect(() => { fetchAssignableSubjects().then(setAll).catch(() => setAll([])); }, []);
-
-  const inTeam = useMemo(() => new Set(team.map((t) => t.subject_id)), [team]);
-
-  const toggle = async (row, on) => {
-    setSaving(row.subject_id);
-    try {
-      await setOfficeTeam(row.employee_id, on);
-      await onChanged();
-    } catch (e) {
-      showToast("Could not update the team. You may not have permission.");
-    } finally { setSaving(""); }
-  };
-
-  const filtered = (all || []).filter((r) => {
-    const s = q.trim().toLowerCase();
-    return !s || (r.full_name || "").toLowerCase().includes(s)
-              || (r.employee_code || "").toLowerCase().includes(s)
-              || (r.department || "").toLowerCase().includes(s);
-  });
-
-  return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box" style={{ maxWidth: 620 }}>
-        <div className="modal-hdr">
-          <div>
-            <h3 className="modal-title">Office team</h3>
-            <div style={{ fontSize: 12, color: "#8a7e72" }}>
-              {team.length} selected · who the report covers
-            </div>
-          </div>
-          <button className="btn-ghost" onClick={onClose}>✕</button>
-        </div>
-        <div style={{ padding: "12px 18px", borderBottom: "1px solid #e8e2d9" }}>
-          <input className="form-input" placeholder="Search name, ID or department…"
-            value={q} onChange={(e) => setQ(e.target.value)} />
-          <p style={{ fontSize: 11, color: "#8a7e72", margin: "8px 0 0" }}>
-            Only hub employees appear here. Imported roster names have no login, so they
-            can never punch on the portal and cannot be on this report.
-          </p>
-        </div>
-        <div className="modal-body" style={{ padding: 0, maxHeight: "56vh", overflow: "auto" }}>
-          {!all ? (
-            <div style={{ padding: 30, textAlign: "center", color: "#8a7e72" }}>Loading…</div>
-          ) : filtered.map((r) => {
-            const on = inTeam.has(r.subject_id);
-            return (
-              <label key={r.subject_id} style={{ display: "flex", gap: 10, alignItems: "center",
-                padding: "9px 18px", borderBottom: "1px solid #f0ece5", cursor: "pointer",
-                background: on ? "rgba(232,162,74,0.06)" : "" }}>
-                <input type="checkbox" checked={on} disabled={saving === r.subject_id}
-                  onChange={(e) => toggle(r, e.target.checked)} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1612" }}>{r.full_name}</div>
-                  <div style={{ fontSize: 10, color: "#8a7e72" }}>
-                    {r.employee_code
-                      ? <span style={{ fontFamily: "monospace", color: "#e8a24a" }}>{r.employee_code}</span>
-                      : "no employee code"}
-                    {r.department ? ` · ${r.department}` : ""}
-                  </div>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── MAIN ────────────────────────────────────────────────────────────────────
 
 export default function OfficeTeamAttendance() {
@@ -211,13 +135,12 @@ export default function OfficeTeamAttendance() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(null);
-  const [manage, setManage] = useState(false);
   const [busy, setBusy] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [people, cfg] = await Promise.all([fetchOfficeTeam(), fetchAttendanceSettings()]);
+      const [people, cfg] = await Promise.all([fetchOfficeTeam(month), fetchAttendanceSettings()]);
       setTeam(people);
       const ids = people.map((p) => p.subject_id);
       const from = month;
@@ -282,10 +205,11 @@ export default function OfficeTeamAttendance() {
 
   return (
     <div className="fade-in">
-      <div className="page-title">Office Team Attendance</div>
+      <div className="page-title">Team Attendance</div>
       <div className="page-sub">
-        A month sheet per person in the same layout as the printed one, for the {team.length} office
-        staff on the punch portal. Click a row to read it; download one person or the whole team as Excel.
+        A month sheet per person in the same layout as the printed one, for everyone who recorded
+        attendance in {monthLabel(month)} — office and site staff alike ({team.length} {team.length === 1 ? "person" : "people"}).
+        Click a row to read it; download one person or the whole list as Excel.
       </div>
 
       <div className="stat-row" style={{ gridTemplateColumns: "repeat(5,1fr)", marginBottom: 20 }}>
@@ -308,7 +232,6 @@ export default function OfficeTeamAttendance() {
           <input className="form-input" placeholder="Name or employee ID…"
             value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <button className="btn-outline" onClick={() => setManage(true)}>⚙ Manage team</button>
         <button className="btn-gold" disabled={busy === "all" || !shown.length}
           onClick={() => exportExcel(shown, "all")}>
           {busy === "all" ? "Building…" : `⬇ Excel — all ${shown.length}`}
@@ -320,7 +243,7 @@ export default function OfficeTeamAttendance() {
           <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>Loading {monthLabel(month)}…</div>
         ) : !team.length ? (
           <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>
-            No one is on the office team yet. Use <strong>Manage team</strong> to add people.
+            No attendance recorded in {monthLabel(month)} yet.
           </div>
         ) : !shown.length ? (
           <div style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>No one matches that search.</div>
@@ -379,10 +302,6 @@ export default function OfficeTeamAttendance() {
       {open && (
         <MonthSheet report={open} onClose={() => setOpen(null)} busy={busy === open.subject.subject_id}
           onDownload={() => exportExcel([open], open.subject.subject_id)} />
-      )}
-      {manage && (
-        <ManageTeam team={team} onClose={() => setManage(false)}
-          onChanged={async () => { await load(); }} />
       )}
     </div>
   );
