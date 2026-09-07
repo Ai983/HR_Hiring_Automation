@@ -289,3 +289,46 @@ textarea.ap-input{resize:vertical;}
 .ap-footer-note{
   font-size:11px;color:#b0a898;text-align:center;line-height:1.7;margin-top:auto;padding-top:12px;
 }
+
+/* ── HR policies (read-only, employee side) ───────────────────────── */
+.ap-policy-wrap{display:flex;flex-direction:column;gap:18px;}
+
+.ap-policy-state{
+  background:#fff;border:1px solid #e8e2d9;border-radius:14px;
+  padding:32px 18px;text-align:center;font-size:13px;color:#8a7e72;line-height:1.6;
+}
+
+.ap-policy-group{display:flex;flex-direction:column;gap:8px;}
+.ap-policy-group-head{display:flex;align-items:center;gap:8px;padding:0 2px;}
+.ap-policy-group-icon{font-size:15px;}
+.ap-policy-group-title{
+  font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;color:#c97a2a;
+}
+.ap-policy-group-count{
+  margin-left:auto;background:#f0ece5;color:#8a7e72;
+  border-radius:20px;padding:1px 8px;font-size:11px;font-weight:800;
+}
+
+/* A button, not a div: this navigates, and on a phone the whole row has to
+   be the tap target — 44px+ tall, no hover-only affordance. */
+.ap-policy-item{
+  width:100%;text-align:left;font-family:'Nunito',sans-serif;
+  background:#fff;border:1px solid #e8e2d9;border-radius:14px;
+  padding:14px;display:flex;align-items:flex-start;gap:12px;cursor:pointer;
+  transition:all 0.18s;
+}
+.ap-policy-item:hover{border-color:#c97a2a;box-shadow:0 6px 18px rgba(201,122,42,0.12);}
+.ap-policy-item:disabled{opacity:0.6;cursor:default;}
+.ap-policy-item-icon{
+  width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  background:rgba(201,122,42,0.10);
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.ap-policy-item-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.ap-policy-item-title{font-weight:700;font-size:14.5px;color:#1a1612;line-height:1.35;}
+.ap-policy-item-desc{font-size:12.5px;color:#5a5048;line-height:1.45;}
+.ap-policy-item-meta{font-size:11px;color:#b0a898;overflow-wrap:anywhere;}
+.ap-policy-item-arrow{
+  color:#c97a2a;font-size:16px;font-weight:700;flex-shrink:0;
+  display:flex;align-items:center;min-height:20px;
+}

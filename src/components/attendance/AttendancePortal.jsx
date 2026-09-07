@@ -6,6 +6,7 @@ import { insertPing } from "../../services/locationService.js";
 import { fetchSites, fetchEmployeeProfile } from "../../services/attendanceService.js";
 import { evaluateGeofence, pillState } from "../../lib/geofence.js";
 import AttendanceHistory from "./AttendanceHistory.jsx";
+import PolicyList from "./PolicyList.jsx";
 import { notifyAttendance, notifyLeaveRequest } from "../../services/whatsappService.js";
 import { notifyLeaveEmail } from "../../services/emailService.js";
 import {
@@ -414,6 +415,7 @@ export default function AttendancePortal() {
   const [error, setError]           = useState("");
   const [showLeave, setShowLeave]   = useState(false);   // leave form open?
   const [showHistory, setShowHistory] = useState(false); // "My Attendance" open?
+  const [showPolicies, setShowPolicies] = useState(false); // "HR Policies" open?
   const [leaveDone, setLeaveDone]   = useState(null);    // { days, paidDays, unpaidDays }
   const [sites, setSites]           = useState([]);      // the 47-site pick-list
   const [siteId, setSiteId]         = useState("");      // which site I'm at
@@ -737,6 +739,29 @@ export default function AttendancePortal() {
     );
   }
 
+  // ── HR POLICIES (read-only) ──
+  // Same shape as My Attendance: its own screen, reached from a box on the
+  // main card, leaving the punch flow untouched.
+  if (showPolicies) {
+    return (
+      <div className="ap-shell">
+        <div className="ap-header">
+          <button className="ap-logout" onClick={() => setShowPolicies(false)}>← Back</button>
+          <div className="ap-header-info" style={{ textAlign: "center" }}>
+            <div className="ap-emp-name">HR Policies</div>
+            <div className="ap-emp-meta">Hagerstone</div>
+          </div>
+          <span style={{ width: 68 }} />
+        </div>
+        <PolicyList />
+        <p className="ap-footer-note" style={{ marginTop: 18 }}>
+          Published by HR. Tap a document to read or download it.<br />
+          Contact HR if something looks out of date.
+        </p>
+      </div>
+    );
+  }
+
   // ── MAIN ATTENDANCE SCREEN ──
   const allDone = checkedInAt && checkedOutAt;
 
@@ -749,7 +774,7 @@ export default function AttendancePortal() {
           <div className="ap-emp-name">{employee.full_name || "Employee"}</div>
           <div className="ap-emp-meta">{employee.role || "Employee"} · {employee.employee_code}</div>
         </div>
-        <button className="ap-logout" onClick={async () => { await signOut(); setEmployee(null); setLocation(null); setGeofences([]); setTodayRec([]); setSelfie(null); setShowLeave(false); setLeaveDone(null); }}>
+        <button className="ap-logout" onClick={async () => { await signOut(); setEmployee(null); setLocation(null); setGeofences([]); setTodayRec([]); setSelfie(null); setShowLeave(false); setShowPolicies(false); setLeaveDone(null); }}>
           Sign out
         </button>
       </div>
@@ -868,6 +893,17 @@ export default function AttendancePortal() {
         <div className="ap-leave-box-body">
           <div className="ap-leave-box-title">Apply for Leave</div>
           <div className="ap-leave-box-sub">Casual · Half Day · Emergency · Sick</div>
+        </div>
+        <div className="ap-leave-box-arrow">→</div>
+      </div>
+
+      {/* HR policies — read-only. Whatever HR publishes in the admin app's
+          HR Policy panel appears here for every employee. */}
+      <div className="ap-leave-box" onClick={() => setShowPolicies(true)}>
+        <div className="ap-leave-box-icon" style={{ background: "rgba(201,122,42,0.12)" }}>📕</div>
+        <div className="ap-leave-box-body">
+          <div className="ap-leave-box-title">HR Policies</div>
+          <div className="ap-leave-box-sub">Company · Timings &amp; Attendance · Leave · ZTP</div>
         </div>
         <div className="ap-leave-box-arrow">→</div>
       </div>

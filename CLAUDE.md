@@ -311,8 +311,9 @@ Performance Management / HR Policy**.
 |---|---|
 | **Shared nav definition** | `src/navigation.js` (sidebar + dashboard both read it) |
 | Dashboard | `src/components/panels/Dashboard.jsx` |
-| Policy panel | `src/components/panels/Policies.jsx` |
-| Policy service | `src/services/policyService.js` |
+| Policy panel (HR) | `src/components/panels/Policies.jsx` |
+| Policy view (employees) | `src/components/attendance/PolicyList.jsx` → `/attend.html` |
+| Policy service | `src/services/policyService.js` (shared by both) |
 | Performance panel | `src/components/panels/Performance.jsx` |
 | Performance service | `src/services/performanceService.js` |
 | Migrations | `20260905120000_hr_policy_library.sql`, `20260905130000_hr_performance_management.sql` |
@@ -323,6 +324,18 @@ Performance Management / HR Policy**.
   is the whole point — a policy only the hiring team can read is not published.
   Writes are `hr.is_hr_admin()`. Verified by simulating both JWTs in SQL: an
   `employee` reads policies and is **blocked** from inserting one.
+- **Employees read them in `/attend.html`**, from an "HR Policies" box below
+  My Attendance and Apply for Leave (`PolicyList.jsx`, its own sub-screen, same
+  shape as My Attendance so the punch flow is untouched). It needed **no backend
+  change**: the portal signs the employee in with a real Hub session before that
+  screen renders, so `policies_read_all` and the `hr-policies` storage read
+  policy already applied. Both surfaces use the **same** `policyService.js` —
+  do not fork a second reader, or the two drift on what "current" means.
+- **The storage policies are scoped to `bucket_id = 'hr-policies'` and that is
+  load-bearing, not tidiness.** Verified in SQL: an `employee` JWT selects the
+  `hr-policies` object (which is what lets `createSignedUrl` work for them) and
+  gets **0 rows** for an `offer-letters` object. An unscoped read policy here
+  would have handed every employee the salary letters.
 - **The `hr-policies` bucket is PRIVATE**, unlike `resumes` and `selfies` which
   are public (anyone with the URL, no login). A ZTP or leave policy names
   disciplinary process and entitlements — a public URL is one forward away from
