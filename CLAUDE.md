@@ -30,20 +30,45 @@ there**, or it builds locally and 404s in production.
 | `/test2.html` | `src/test2-main.jsx` | **Walk-in assessment, level 2 (role-specific) — no login** |
 | `/apply.html` | `src/apply-main.jsx` | **Candidate application form — no login at all** |
 
-### Navigation
+### Navigation — no router, and **no sidebar** (removed 8 Sep 2026)
 
 There is no router. `panel` is a string in `src/context/AppContext.jsx`, switched
 by `{panel === "x" && <X/>}` in `src/App.jsx`.
 
-**`src/navigation.js` is the single definition of the nav.** Both the sidebar
-and the dashboard render from `buildNav()` — the dashboard exists to put every
-page one click away, so the two lists have to agree, and two lists that "look
-the same" drift the moment somebody adds a panel to one of them. Do not
-re-list panels in either component.
+The sidebar is **gone**. Navigation is four section dropdowns — Hire, Employee
+Management, Performance Management, HR Policy — rendered twice from one
+component (`NavMenu.jsx`):
+
+| Where | Variant | Why |
+|---|---|---|
+| Dashboard | `variant="hero"` | big buttons; the front door |
+| Top bar (`TopNav.jsx`) | `variant="bar"` | on every page |
+
+**`src/navigation.js` is the single definition of the nav.** Both surfaces
+render from `buildNav()`; two lists that "look the same" drift the moment
+somebody adds a panel to one. Do not re-list panels in a component.
 
 A new panel needs three edits: the import + line in `App.jsx`, its module in
 `App.jsx` (`COMMON` for everyone, else the `HIRING` set), and an item in the
 right group in `navigation.js`.
+
+**`TopNav` is not decoration — do not delete it to "finish" removing the
+sidebar.** The sidebar was also the only route *back* to the dashboard, the
+only Sign out, and the only place the signed-in identity showed. With no router
+there is no browser history to fall back on, so without the bar anyone who
+opened All Jobs would be stuck there. The bar carries exactly what the
+dashboard cannot: the way home, who you are, and the way out.
+
+- `open` state for a dropdown is owned by the **parent**, not `NavMenu`. Only
+  one menu may be open at a time and siblings cannot enforce that themselves.
+- Both surfaces close on outside-click and Escape. A menu you can only dismiss
+  by picking from it is a trap.
+- The last menu in a row anchors its popup `right:0` — the popup is wider
+  (250px) than a dashboard column can be (230px), so left-anchoring the last
+  one pushes a horizontal scrollbar onto `.main`.
+- **Badge counts live in `AppContext` (`navBadges`), not in a component.** The
+  sidebar and dashboard used to poll the same three counts separately and could
+  disagree for up to 60s. One source, one timer.
 
 - `item.panel` is what gets written to `panel`; `item.id` is only a React key.
   They differ for the four **HR Policy** entries, which all open the `policies`
@@ -309,7 +334,9 @@ Performance Management / HR Policy**.
 
 | Piece | Path |
 |---|---|
-| **Shared nav definition** | `src/navigation.js` (sidebar + dashboard both read it) |
+| **Shared nav definition** | `src/navigation.js` (top bar + dashboard both read it) |
+| Section dropdown | `src/components/layout/NavMenu.jsx` (one component, two skins) |
+| Top bar | `src/components/layout/TopNav.jsx` (replaced the sidebar) |
 | Dashboard | `src/components/panels/Dashboard.jsx` |
 | Policy panel (HR) | `src/components/panels/Policies.jsx` |
 | Policy view (employees) | `src/components/attendance/PolicyList.jsx` → `/attend.html` |

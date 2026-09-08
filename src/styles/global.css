@@ -4,35 +4,140 @@ body{background:#f7f4ef;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:#ede8e0;}
 ::-webkit-scrollbar-thumb{background:#c4bdb2;border-radius:4px;}
-.app{display:flex;min-height:100vh;background:#f7f4ef;font-family:'Nunito',sans-serif;}
-/* Sidebar */
-.sidebar{width:220px;min-width:220px;background:#1a1612;display:flex;flex-direction:column;padding:28px 0;position:sticky;top:0;height:100vh;}
-.sidebar-logo{padding:0 22px 28px;border-bottom:1px solid #2e2925;}
-.logo-mark{display:flex;align-items:center;gap:10px;}
-.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,#e8a24a,#c97a2a);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:700;font-size:16px;color:#1a1612;}
-.logo-text{font-family:'Fraunces',serif;font-weight:700;font-size:18px;color:#f5f0e8;letter-spacing:-0.3px;}
-.sidebar-nav{padding:18px 12px;flex:1;display:flex;flex-direction:column;gap:4px;overflow-y:auto;}
-.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:500;color:#8a7e72;transition:all 0.18s;border:none;background:none;width:100%;text-align:left;}
-.nav-item:hover{background:#2a241e;color:#e8ddd0;}
-.nav-item.active{background:#2e2720;color:#e8a24a;font-weight:600;}
-.nav-item .nav-icon{font-size:16px;width:20px;text-align:center;}
-.nav-badge{margin-left:auto;background:#e8a24a;color:#1a1612;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700;}
-.nav-group{display:flex;flex-direction:column;gap:4px;}
-.nav-group-header{display:flex;align-items:center;gap:11px;padding:11px 12px;margin-top:6px;border-radius:9px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:#7c6f61;transition:all 0.18s;border:none;background:none;width:100%;text-align:left;}
-.nav-group-header:hover{background:#2a241e;color:#e8ddd0;}
-.nav-group-header.open{color:#c8b89a;}
-.nav-group-header .nav-icon{font-size:15px;width:20px;text-align:center;}
-.nav-group-label{flex:1;}
-.nav-chevron{font-size:10px;color:#6b5f52;}
-.nav-group-items{display:flex;flex-direction:column;gap:4px;padding-left:8px;margin-left:9px;border-left:1px solid #2e2925;animation:navGroupIn 0.16s ease;}
-@keyframes navGroupIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
-.sidebar-footer{padding:18px 22px 0;border-top:1px solid #2e2925;}
-.user-pill{display:flex;align-items:center;gap:10px;}
-.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#e8a24a,#d4845a);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#1a1612;}
-.user-name{font-size:13px;font-weight:600;color:#c8b89a;}
-.user-role{font-size:11px;color:#5a5048;}
+/* The sidebar is gone. The app is a dark top bar over a full-width page;
+   navigation lives in the four section dropdowns (NavMenu.jsx), on the bar
+   and again, larger, on the dashboard. */
+.app{display:flex;flex-direction:column;min-height:100vh;background:#f7f4ef;font-family:'Nunito',sans-serif;}
+
+/* ── Top bar ─────────────────────────────────────────────────────── */
+.topnav{
+  background:#1a1612;display:flex;align-items:center;gap:18px;
+  padding:0 20px;height:60px;position:sticky;top:0;z-index:200;
+  border-bottom:1px solid #2e2925;
+}
+.topnav-brand{
+  display:flex;align-items:center;gap:10px;background:none;border:none;
+  cursor:pointer;padding:6px 8px;border-radius:9px;flex-shrink:0;transition:background 0.15s;
+}
+.topnav-brand:hover{background:#2a241e;}
+.topnav-logo{
+  width:30px;height:30px;background:linear-gradient(135deg,#e8a24a,#c97a2a);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif;font-weight:700;font-size:15px;color:#1a1612;
+}
+.topnav-brand-text{font-family:'Fraunces',serif;font-weight:700;font-size:17px;color:#f5f0e8;letter-spacing:-0.3px;}
+
+.topnav-menus{display:flex;align-items:center;gap:4px;flex:1;min-width:0;flex-wrap:wrap;}
+.topnav-right{display:flex;align-items:center;gap:14px;flex-shrink:0;}
+/* SyncStatus is styled for a dark surface (it lived in the sidebar), which
+   is why this bar stayed dark. It needs a bounded width here — its own
+   styles are width:100%. */
+.topnav-sync{width:170px;}
+.topnav-sync>div{margin-bottom:0!important;}
+.topnav-user{display:flex;align-items:center;gap:9px;min-width:0;}
+.topnav-avatar{
+  width:30px;height:30px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#e8a24a,#d4845a);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#1a1612;
+}
+.topnav-user-text{display:flex;flex-direction:column;min-width:0;}
+.topnav-user-name{font-size:12.5px;font-weight:600;color:#c8b89a;white-space:nowrap;}
+.topnav-user-mail{font-size:10.5px;color:#6b5f52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;}
+.topnav-signout{
+  background:none;border:1px solid #2e2925;border-radius:8px;color:#8a7e72;
+  padding:7px 12px;font-family:'Nunito',sans-serif;font-size:12px;cursor:pointer;transition:all 0.15s;
+}
+.topnav-signout:hover{border-color:#c97a2a;color:#e8a24a;}
+
+/* ── Section dropdown (shared: top bar + dashboard) ──────────────── */
+.navmenu{position:relative;}
+
+.navmenu-btn{
+  display:flex;align-items:center;gap:9px;cursor:pointer;
+  font-family:'Nunito',sans-serif;text-align:left;transition:all 0.15s;
+}
+.navmenu-icon{font-size:16px;flex-shrink:0;}
+.navmenu-label{display:flex;flex-direction:column;min-width:0;}
+.navmenu-chev{font-size:10px;opacity:0.7;flex-shrink:0;}
+
+/* Compact, on the dark bar */
+.navmenu-bar .navmenu-btn,.navmenu-plain{
+  background:none;border:none;border-radius:9px;padding:9px 12px;
+  font-size:13.5px;font-weight:600;color:#8a7e72;
+}
+.navmenu-bar .navmenu-btn:hover,.navmenu-plain:hover{background:#2a241e;color:#e8ddd0;}
+.navmenu-bar .navmenu-btn.open{background:#2e2720;color:#e8a24a;}
+.navmenu-bar .navmenu-btn.current,.navmenu-plain.current{color:#e8a24a;}
+.navmenu-plain{display:flex;align-items:center;gap:9px;cursor:pointer;font-family:'Nunito',sans-serif;}
+.navmenu-bar .navmenu-total{
+  background:#e8a24a;color:#1a1612;border-radius:20px;padding:1px 7px;font-size:10.5px;font-weight:800;
+}
+
+/* Big, on the dashboard */
+.dash-sections{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:18px;
+}
+.navmenu-hero .navmenu-btn{
+  width:100%;background:#fff;border:1.5px solid #e8e2d9;border-radius:14px;
+  padding:18px 18px;align-items:flex-start;gap:12px;
+}
+.navmenu-hero .navmenu-btn:hover{border-color:#c97a2a;box-shadow:0 6px 18px rgba(201,122,42,0.12);transform:translateY(-1px);}
+.navmenu-hero .navmenu-btn.open{border-color:#c97a2a;box-shadow:0 6px 18px rgba(201,122,42,0.14);}
+.navmenu-hero .navmenu-icon{font-size:22px;line-height:1.1;}
+.navmenu-hero .navmenu-label{
+  flex:1;font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:#1a1612;gap:4px;
+}
+.navmenu-hero .navmenu-blurb{
+  font-family:'Nunito',sans-serif;font-size:11.5px;font-weight:400;color:#8a7e72;line-height:1.45;
+}
+.navmenu-hero .navmenu-total{
+  background:#c97a2a;color:#fff;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:800;flex-shrink:0;
+}
+.navmenu-hero .navmenu-chev{color:#c97a2a;margin-top:4px;}
+
+/* The popup itself — same in both places */
+.navmenu-pop{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:300;
+  min-width:250px;max-height:min(70vh,520px);overflow-y:auto;
+  background:#fff;border:1px solid #e8e2d9;border-radius:12px;
+  box-shadow:0 14px 40px rgba(26,22,18,0.18);
+  padding:6px;display:flex;flex-direction:column;gap:2px;
+  animation:navPopIn 0.14s ease;
+}
+/* Near the right edge the menu would run off-screen; anchoring the last
+   menu to its right keeps it on the page without measuring. The popup is
+   wider (250px) than a dashboard column can be (230px min), so the last
+   column needs this too or it pushes a horizontal scrollbar onto .main. */
+.topnav-menus .navmenu:last-child .navmenu-pop,
+.dash-sections .navmenu:last-child .navmenu-pop{left:auto;right:0;}
+@keyframes navPopIn{from{opacity:0;transform:translateY(-5px);}to{opacity:1;transform:translateY(0);}}
+
+.navmenu-item{
+  display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  background:none;border:none;border-radius:9px;padding:10px 12px;cursor:pointer;
+  font-family:'Nunito',sans-serif;font-size:13.5px;font-weight:600;color:#3a3028;transition:background 0.12s;
+}
+.navmenu-item:hover{background:#faf5ee;color:#c97a2a;}
+.navmenu-item.active{background:rgba(201,122,42,0.10);color:#c97a2a;}
+.navmenu-item-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0;}
+.navmenu-item-label{flex:1;min-width:0;}
+.navmenu-item-badge{
+  background:#c97a2a;color:#fff;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:800;flex-shrink:0;
+}
+
 /* Main area */
 .main{flex:1;overflow-y:auto;padding:32px 36px;}
+
+@media(max-width:1100px){
+  .topnav-sync{display:none;}         /* diagnostics, not navigation */
+  .topnav-user-mail{display:none;}
+}
+@media(max-width:820px){
+  .topnav{height:auto;flex-wrap:wrap;padding:10px 14px;gap:10px;}
+  .topnav-menus{order:3;width:100%;}
+  .main{padding:20px 16px;}
+  .navmenu-pop{min-width:220px;}
+}
 .page-title{font-family:'Fraunces',serif;font-weight:700;font-size:26px;color:#1a1612;letter-spacing:-0.5px;margin-bottom:4px;}
 .page-sub{font-size:13px;color:#8a7e72;margin-bottom:28px;}
 /* Cards */

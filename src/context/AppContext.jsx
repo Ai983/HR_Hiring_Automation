@@ -1,9 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../supabaseClient.js";
-import { SEED_JOBS, SEED_APPLICANTS } from "../constants.js";
+import { SEED_JOBS, SEED_APPLICANTS, PORTALS } from "../constants.js";
 import { useToast } from "../hooks/useToast.js";
 import { fetchJobs } from "../services/jobService.js";
 import { fetchApplicants } from "../services/applicantService.js";
+import { fetchSurveyNewCount } from "../services/surveyService.js";
+import { fetchPendingLeaveCount } from "../services/leaveService.js";
+import { fetchTodaySubmittedCount } from "../services/assessmentService.js";
 import { onAuthChange, fetchContext, signIn, signOut, consumeSsoHandoff } from "../services/authService.js";
 
 const AppContext = createContext(null);
@@ -71,6 +74,45 @@ export function AppProvider({ children }) {
     setApplicants(await fetchApplicants());
   }, []);
 
+  // ── Nav badge counts ──
+  // Lives here rather than in a component because BOTH the top bar and the
+  // dashboard show these numbers. When the sidebar and the dashboard each ran
+  // their own poller they queried the same three counts twice a minute and
+  // could disagree for up to 60s. One source, one timer.
+  const [liveCounts, setLiveCounts] = useState({ survey: 0, leave: 0, assessment: 0 });
+  useEffect(() => {
+    if (!supabase || !session) return;
+    let alive = true;
+    const refresh = () => {
+      Promise.allSettled([fetchSurveyNewCount(), fetchPendingLeaveCount(), fetchTodaySubmittedCount()])
+        .then(([s, l, a]) => {
+          if (!alive) return;
+          setLiveCounts({
+            survey:     s.status === "fulfilled" ? s.value : 0,
+            leave:      l.status === "fulfilled" ? l.value : 0,
+            assessment: a.status === "fulfilled" ? a.value : 0,
+          });
+        });
+    };
+    refresh();
+    const iv = setInterval(refresh, 60000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [session]);
+
+  const navBadges = useMemo(() => ({
+    jobs:       jobs.filter((j) => PORTALS.some((p) => j[p.id]?.status === "live")).length,
+    applicants: applicants.filter((a) => a.stage === "new").length,
+    survey:     liveCounts.survey,
+    assessment: liveCounts.assessment,
+    leave:      liveCounts.leave,
+    calling:    applicants.filter((a) => a.stage === "screening" && a.shortlisted).length
+              + applicants.filter((a) => a.stage === "calling").length,
+    interviews: applicants.filter((a) => a.stage === "interview").length,
+    reference:  applicants.filter((a) => a.stage === "reference").length,
+    offers:     applicants.filter((a) => a.stage === "offer").length,
+    onboarding: applicants.filter((a) => a.stage === "hired" || a.stage === "onboarding").length,
+  }), [jobs, applicants, liveCounts]);
+
   const login = useCallback(async (email, password) => {
     const { session: s } = await signIn(email, password);
     await resolve(s);
@@ -92,6 +134,7 @@ export function AppProvider({ children }) {
     panel, setPanel,
     selectedJob, setSelectedJob,
     policyCategory, setPolicyCategory,
+    navBadges,
     modal, setModal,
     loading,
     toast, showToast,

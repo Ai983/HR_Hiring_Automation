@@ -2,7 +2,7 @@ import "./styles/global.css";
 import { useEffect } from "react";
 import { AppProvider, useApp } from "./context/AppContext.jsx";
 import Login from "./components/auth/Login.jsx";
-import Sidebar from "./components/layout/Sidebar.jsx";
+import TopNav from "./components/layout/TopNav.jsx";
 import Toast from "./components/layout/Toast.jsx";
 import Dashboard from "./components/panels/Dashboard.jsx";
 import AllJobs from "./components/panels/AllJobs.jsx";
@@ -111,7 +111,7 @@ function AppContent() {
       {modal?.type === "resumeUpload" && <ResumeUploadModal initialJobId={modal.data?.jobId} onClose={() => setModal(null)} />}
 
       <div className="app">
-        <Sidebar />
+        <TopNav />
         <main className="main">
           {!allowed ? (
             <div className="fade-in" style={{ padding: 40, textAlign: "center", color: "#8a7e72" }}>

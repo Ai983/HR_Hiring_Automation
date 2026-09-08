@@ -1,19 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { PORTALS, STAGES, STAGE_META, STATUS_META } from "../../constants.js";
 import { totalApplicants, totalViews } from "../../helpers.js";
 import { buildNav, visibleGroups } from "../../navigation.js";
-import { fetchSurveyNewCount } from "../../services/surveyService.js";
-import { fetchPendingLeaveCount } from "../../services/leaveService.js";
-import { fetchTodaySubmittedCount } from "../../services/assessmentService.js";
+import NavMenu from "../layout/NavMenu.jsx";
 
 // ─────────────────────────────────────────────────────────────────────
-// The dashboard is the front door: every page in the sidebar is one click
-// away from here, grouped the way HR thinks about the work — Hire, Employee
-// Management, Performance, HR Policy.
+// The dashboard is the front door. There is no sidebar: navigation is four
+// section buttons, each opening a dropdown of the pages inside it.
 //
-// The tile list is NOT written out here. It comes from navigation.js, the
-// same definition the sidebar renders, so the two cannot drift.
+// The page lists are NOT written out here. They come from navigation.js —
+// the same definition the top bar renders — so the two cannot drift.
 // ─────────────────────────────────────────────────────────────────────
 
 function greeting() {
@@ -21,48 +18,6 @@ function greeting() {
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
-}
-
-/** One clickable page tile. */
-function NavTile({ item, onClick }) {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: "flex", alignItems: "center", gap: 10, width: "100%",
-        padding: "13px 14px", borderRadius: 12, cursor: "pointer", textAlign: "left",
-        background: "#fff",
-        border: `1.5px solid ${hover ? "#c97a2a" : "#e8e2d9"}`,
-        boxShadow: hover ? "0 4px 14px rgba(201,122,42,0.10)" : "none",
-        transform: hover ? "translateY(-1px)" : "none",
-        transition: "all 0.15s",
-        fontFamily: "'Nunito',sans-serif",
-      }}
-    >
-      <span style={{
-        width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-        background: hover ? "rgba(201,122,42,0.12)" : "#faf8f5",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 16, transition: "background 0.15s",
-      }}>
-        {item.icon}
-      </span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 700, color: "#1a1612" }}>
-        {item.label}
-      </span>
-      {item.badge > 0 && (
-        <span style={{
-          background: "#c97a2a", color: "#fff", borderRadius: 20,
-          padding: "2px 8px", fontSize: 11, fontWeight: 800, flexShrink: 0,
-        }}>
-          {item.badge}
-        </span>
-      )}
-    </button>
-  );
 }
 
 function SectionHeader({ icon, label, blurb }) {
@@ -81,68 +36,51 @@ function SectionHeader({ icon, label, blurb }) {
 
 export default function Dashboard() {
   const {
-    jobs, applicants, setPanel, setSelectedJob, setPolicyCategory,
-    ctx, hasModule,
+    jobs, applicants, setPanel, setSelectedJob,
+    ctx, hasModule, navBadges,
   } = useApp();
 
-  // Badge counts. The sidebar polls these on a timer; here a single fetch on
-  // mount is right — you are looking at the dashboard for seconds, not
-  // leaving it open all day, and a second poller doubles the query load for
-  // numbers nobody watches change.
-  const [counts, setCounts] = useState({ survey: 0, leave: 0, assessment: 0 });
-  useEffect(() => {
-    let alive = true;
-    Promise.allSettled([fetchSurveyNewCount(), fetchPendingLeaveCount(), fetchTodaySubmittedCount()])
-      .then(([s, l, a]) => {
-        if (!alive) return;
-        setCounts({
-          survey:     s.status === "fulfilled" ? s.value : 0,
-          leave:      l.status === "fulfilled" ? l.value : 0,
-          assessment: a.status === "fulfilled" ? a.value : 0,
-        });
-      });
-    return () => { alive = false; };
-  }, []);
+  const [openId, setOpenId] = useState(null); // only one dropdown open at a time
 
   const liveJobs   = jobs.filter((j) => PORTALS.some((p) => j[p.id]?.status === "live")).length;
   const totalApps  = applicants.length;
   const hiredCount = applicants.filter((a) => a.stage === "hired").length;
   const totalJobViews = jobs.reduce((a, j) => a + totalViews(j), 0);
 
-  const nav = buildNav({
-    canRegularize: !!ctx?.is_super_admin,
-    badges: {
-      jobs:       liveJobs,
-      applicants: applicants.filter((a) => a.stage === "new").length,
-      survey:     counts.survey,
-      assessment: counts.assessment,
-      leave:      counts.leave,
-      calling:    applicants.filter((a) => a.stage === "screening" && a.shortlisted).length
-                + applicants.filter((a) => a.stage === "calling").length,
-      interviews: applicants.filter((a) => a.stage === "interview").length,
-      reference:  applicants.filter((a) => a.stage === "reference").length,
-      offers:     applicants.filter((a) => a.stage === "offer").length,
-      onboarding: applicants.filter((a) => a.stage === "hired" || a.stage === "onboarding").length,
-    },
-  });
-
-  const go = (item) => {
-    if (item.category) setPolicyCategory(item.category);
-    if (item.panel !== "applicants") setSelectedJob(null);
-    setPanel(item.panel);
-  };
-
-  const groups = visibleGroups(nav, hasModule);
+  const groups = visibleGroups(
+    buildNav({ badges: navBadges, canRegularize: !!ctx?.is_super_admin }),
+    hasModule
+  );
   const firstName = (ctx?.name || "").trim().split(/\s+/)[0] || "HR";
 
   return (
     <div className="fade-in">
       <div className="page-title">{greeting()}, {firstName}</div>
-      <div className="page-sub">Everything you run, one click away.</div>
+      <div className="page-sub">Pick a section — every page is in here.</div>
+
+      {/* ── The four section buttons. Each opens a dropdown of its pages. ── */}
+      <div className="dash-sections">
+        {groups.map((g) => (
+          <NavMenu
+            key={g.id}
+            group={g}
+            variant="hero"
+            open={openId === g.id}
+            onToggle={() => setOpenId((prev) => (prev === g.id ? null : g.id))}
+            onClose={() => setOpenId(null)}
+          />
+        ))}
+      </div>
+
+      <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 12 }}>
+        {ctx?.is_hr_admin
+          ? "HR Policy: you can upload and archive documents — everyone signed in can read them."
+          : "HR Policy: published by HR. Open a section to read or download the current document."}
+      </div>
 
       {/* Hiring snapshot — only meaningful with the hireflow module. */}
       {hasModule("hireflow") && (
-        <div className="stat-row" style={{ marginTop: 18 }}>
+        <div className="stat-row" style={{ marginTop: 26 }}>
           {[
             { cls: "s1", val: liveJobs,      lbl: "Active Postings" },
             { cls: "s2", val: totalApps,     lbl: "Total Applicants" },
@@ -156,32 +94,6 @@ export default function Dashboard() {
           ))}
         </div>
       )}
-
-      {/* ── Section tiles: every page, grouped ── */}
-      {groups.map((g) => (
-        <div key={g.id}>
-          <SectionHeader icon={g.icon} label={g.label} blurb={g.blurb} />
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
-            gap: 10,
-          }}>
-            {g.items.map((item) => (
-              <NavTile key={item.id} item={item} onClick={() => go(item)} />
-            ))}
-          </div>
-
-          {/* HR Policy gets a line of context: it is the one section where
-              what people need to know is "who can change this", not a count. */}
-          {g.id === "grp-policy" && (
-            <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 10 }}>
-              {ctx?.is_hr_admin
-                ? "You can upload and archive policy documents. Everyone signed in can read them."
-                : "Published by HR. Open a section to read or download the current document."}
-            </div>
-          )}
-        </div>
-      ))}
 
       {/* ── Hiring detail, kept below the navigation ── */}
       {hasModule("hireflow") && (
