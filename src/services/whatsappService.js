@@ -104,8 +104,8 @@ export async function notifyAttendance(employee, { type, time, status, address }
 // Confirm to the EMPLOYEE that their leave request was submitted.
 //
 // Approvers are deliberately NOT messaged on WhatsApp. Leave requests reach
-// management through the email trail instead (notify-leave-email → ea@ and
-// systems@, every request, no routing), so Dhruv and Bhaskar are not pinged
+// management through the email trail instead (notify-leave-email → ea@, hr@
+// and systems@, every request, no routing), so Dhruv and Bhaskar are not pinged
 // personally each time someone applies. Do not re-add an approver send here
 // without checking that decision still holds.
 //   req: { request_to, leave_type, reason, start_date, end_date,

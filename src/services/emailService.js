@@ -15,7 +15,7 @@ const env = (typeof import.meta !== "undefined" && import.meta.env) || {};
 // so a request raised on localhost still mails a link approvers can open.
 const HUB_URL = env.VITE_HUB_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
-// Notify HR (ea@ + systems@) that an employee has applied for leave.
+// Notify HR (ea@ + hr@ + systems@) that an employee has applied for leave.
 // Never throws — a mail failure must not cost the employee their request.
 // Returns { success, error?, sent_to? }.
 export async function notifyLeaveEmail(employee, leave) {

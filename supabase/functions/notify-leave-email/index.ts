@@ -11,7 +11,7 @@
 // leave_requests row is inserted. Requires a signed-in caller — Supabase
 // enforces that for us via verify_jwt, so only a logged-in employee can make
 // this send. The payload is trusted the same way the WhatsApp path trusts it:
-// this is an internal tool and the mail only ever goes to two fixed HR inboxes.
+// this is an internal tool and the mail only ever goes to fixed HR inboxes.
 //
 // Secrets (supabase secrets set ...):
 //   SMTP_USER  systems@hagerstone.com
@@ -29,8 +29,8 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
-// Both HR inboxes get every request. Overridable without a redeploy.
-const DEFAULT_TO = ["ea@hagerstone.com", "systems@hagerstone.com"];
+// Every HR inbox gets every request. Overridable without a redeploy.
+const DEFAULT_TO = ["ea@hagerstone.com", "hr@hagerstone.com", "systems@hagerstone.com"];
 
 // Leave types, mirrored from src/leaveConfig.js. The old mail printed the
 // English label with the Hindi in brackets ("Emergency Leave (आपात छुट्टी)"),

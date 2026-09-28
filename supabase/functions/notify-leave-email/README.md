@@ -1,6 +1,6 @@
 # notify-leave-email — setup
 
-Sends the leave-request email to **ea@hagerstone.com** and **systems@hagerstone.com**
+Sends the leave-request email to **ea@hagerstone.com**, **hr@hagerstone.com** and **systems@hagerstone.com**
 from **systems@hagerstone.com**, replacing the Google Form / Apps Script mail.
 
 Triggered by `src/services/emailService.js` from the attendance portal, right

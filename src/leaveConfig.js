@@ -36,7 +36,7 @@ export const REQUESTABLE_LEAVE_TYPES = LEAVE_TYPES.filter((t) => !t.adminOnly);
 //
 // The `phone` numbers that used to sit here were removed deliberately: leave
 // requests no longer WhatsApp the approver. Management is notified through the
-// email trail instead (notify-leave-email → ea@ + systems@, every request), so
+// email trail instead (notify-leave-email → ea@ + hr@ + systems@, every request), so
 // nobody is pinged personally each time someone applies. Re-adding a number
 // here does nothing on its own — see notifyLeaveRequest in whatsappService.js.
 export const APPROVERS = [
