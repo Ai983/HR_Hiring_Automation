@@ -32,6 +32,7 @@ they are shared with live apps.
 | 18 | `20260831120000_hr_applicant_self_apply_form.sql` | **candidate self-application form** (`/apply.html`). Adds the structured profile the form collects to `hr.applicants` — `designation`, `department`, `location`, `industry`, `total_experience_years`, `skills` (jsonb), `notice_period` — plus bounds checks and a `lower(email)` index for the duplicate lookup the public endpoint runs on every submit. Drops `NOT NULL` on `job_id` (a self-applying candidate typed a designation, not a `hr.jobs` row) and widens the portal check with `'form'`. Additive; every existing row stays valid. Access model unchanged: **no `anon` policy and no `anon` grant** — the form writes through the service-role `apply` edge function, the same shape as `assessment`. Applied to the hub **2026-08-31** |
 | 19 | `20260905120000_hr_policy_library.sql` | **HR policy library** — `hr.policies` (category / title / file metadata / version / effective_from / is_active) plus the **private `hr-policies` storage bucket** and its four `storage.objects` policies. Read is open to **every authenticated user** (a policy nobody can open is not published); write is `hr.is_hr_admin()`. Superseded policies are archived (`is_active = false`), never overwritten — "which version was in force in March" is asked in exactly the disputes these documents settle. `anon` is **revoked at grant level**, not just blocked by RLS. Applied to the hub **2026-09-05** |
 | 20 | `20260905130000_hr_performance_management.sql` | **performance management (basic)** — `hr.performance_cycles` + `hr.performance_reviews` (goals, self/manager/final rating 1–5 as `numeric(2,1)`, status, unique on `(cycle_id, employee_id)`). Reviews are readable by **their own employee or `is_hr_admin()`**; writes are hr_admin. Deliberately minimal: no KRA weighting, no 360, no calibration, no increment workflow — Hagerstone's appraisal process has not been specified, and inventing five tables of it would mean HR working around a process we made up. Applied to the hub **2026-09-05** |
+| 21 | `20260911120000_hr_add_vinfast_jhotwara_site.sql` | **Attendance site addition** — adds `Vinfast - Jhotwara` to `hr.sites` as an active manual site with no guessed coordinates, so the punch dropdown can use it immediately and HR can pin/verify the geofence later in Attendance Setup. |
 
 `17` (`20260827130000_hr_three_role_access_model.sql`) is the current access model:
 authority is `hr.employee_profile.access_level` (employee / hr_admin / super_admin), assigned
@@ -69,7 +70,7 @@ All fourteen are idempotent — `create table if not exists`, `create or replace
 
 ```sql
 select * from hr.attendance_settings;          -- 08:00-19:00, late 09:30, OT past 540m
-select count(*) from hr.sites;                 -- 45
+select count(*) from hr.sites;                 -- 46 after Vinfast - Jhotwara
 select count(*) from hr.holidays;              -- 10
 
 -- views must be security_invoker, or they leak the underlying tables
