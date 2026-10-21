@@ -25,6 +25,34 @@ export function istTime(ts) {
   });
 }
 
+/** YYYY-MM-DD in IST — the work_date a punch belongs to. */
+const istDate = (ts) => new Date(ts).toLocaleDateString("en-CA", { timeZone: IST });
+
+/**
+ * The selfie behind each day's IN and OUT time, keyed by work_date.
+ *
+ * Same pick as hr.attendance_day makes for the times themselves — the first
+ * check-in and the last check-out — so the link always opens the photo taken
+ * with the punch whose time is printed beside it. If that punch has no photo
+ * (a sheet import, an admin backfill) the day gets no link, rather than a
+ * photo from some other punch that would vouch for a time it was not taken at.
+ */
+function photosByDay(punches) {
+  const out = new Map();
+  for (const p of punches) {
+    const day = istDate(p.recorded_at);
+    const cur = out.get(day) || {};
+    if (p.type === "check_in" && (!cur.inAt || p.recorded_at < cur.inAt)) {
+      cur.inAt = p.recorded_at; cur.inPhoto = p.selfie_url || p.photo_url || null;
+    }
+    if (p.type === "check_out" && (!cur.outAt || p.recorded_at > cur.outAt)) {
+      cur.outAt = p.recorded_at; cur.outPhoto = p.selfie_url || p.photo_url || null;
+    }
+    out.set(day, cur);
+  }
+  return out;
+}
+
 /** "01-Jul-2026", the sheet's own date format. */
 export function reportDate(iso) {
   const d = new Date(`${iso}T00:00:00`);
@@ -61,9 +89,11 @@ function isLate(inAt, lateAfter) {
  * @param remarks  hr.attendance_remarks rows for the month
  * @param settings hr.attendance_settings (for late_after)
  * @param month    "YYYY-MM-01"
+ * @param punches  hr.attendance rows for the month (for the photo links)
  */
-export function buildReport({ subject, summary, days, remarks = [], settings, month }) {
+export function buildReport({ subject, summary, days, remarks = [], settings, month, punches = [] }) {
   const byDate = new Map(remarks.map((r) => [r.remark_date, r.remark]));
+  const photos = photosByDay(punches);
   const lateAfter = settings?.late_after;
 
   // Rows are exactly what hr.attendance_day holds — no invented dates.
@@ -99,6 +129,9 @@ export function buildReport({ subject, summary, days, remarks = [], settings, mo
         name: subject.full_name,
         inTime: istTime(d.in_at),
         outTime: istTime(d.out_at),
+        // Only with a time beside it — a regularized day can blank a time.
+        inPhoto: d.in_at ? photos.get(d.work_date)?.inPhoto || null : null,
+        outPhoto: d.out_at ? photos.get(d.work_date)?.outPhoto || null : null,
         // A day with a check-in but no check-out has no measurable duration.
         // Blank, never zero: zero reads as "worked nothing" and drags the
         // month total down for what is really a missing punch.

@@ -113,6 +113,35 @@ export async function fetchOfficeTeamDays({ subjectIds, from, to }) {
   return out;
 }
 
+/** The raw punches behind the month, for the IN / OUT photo links.
+ *
+ *  hr.attendance_day folds a day's photos into one `photo` column, so it cannot
+ *  say which is the check-in selfie and which the check-out one. The punches
+ *  can. Window is the IST month, as an instant, so a 00:30 IST punch on the 1st
+ *  is not lost to UTC. Paged for the same max-rows reason as the days. */
+export async function fetchOfficeTeamPunches({ subjectIds, from, to }) {
+  if (!supabase || !subjectIds?.length) return [];
+  const start = new Date(`${from}T00:00:00+05:30`).toISOString();
+  const end   = new Date(`${to}T23:59:59.999+05:30`).toISOString();
+  const PAGE = 1000;
+  const out = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from("attendance")
+      .select("id, employee_id, person_ref, type, recorded_at, selfie_url, photo_url")
+      .in("employee_id", subjectIds)
+      .gte("recorded_at", start)
+      .lte("recorded_at", end)
+      .order("recorded_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+  return out;
+}
+
 /** Remarks for the month, so the report's Remarks column is not always blank. */
 export async function fetchOfficeTeamRemarks({ from, to }) {
   if (!supabase) return [];

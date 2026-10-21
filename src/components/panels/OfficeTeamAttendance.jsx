@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import {
   fetchOfficeTeam,
-  fetchOfficeTeamMonth, fetchOfficeTeamDays, fetchOfficeTeamRemarks,
+  fetchOfficeTeamMonth, fetchOfficeTeamDays, fetchOfficeTeamRemarks, fetchOfficeTeamPunches,
   monthOptions, monthLabel, monthEnd,
 } from "../../services/officeTeamService.js";
 import { fetchAttendanceSettings } from "../../services/attendanceService.js";
@@ -29,6 +29,18 @@ const STATUS_STYLE = {
   "Leave":   { background: "rgba(99,102,241,0.12)", color: "#4f46e5" },
   "Holiday": { background: "rgba(14,165,233,0.14)", color: "#0369a1" },
 };
+
+// Opens the selfie in a new tab. The selfies bucket is public, so the stored
+// URL opens as-is with no signing round trip.
+function PhotoLink({ url, label }) {
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" title={`Open ${label} photo`}
+      style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: "#0a66c2", textDecoration: "none", whiteSpace: "nowrap" }}>
+      📷 Photo
+    </a>
+  );
+}
 
 // ─── One person's month sheet ────────────────────────────────────────────────
 
@@ -81,9 +93,11 @@ function MonthSheet({ report, onClose, onDownload, busy }) {
               {report.rows.map((r) => (
                 <tr key={r.date} style={{ background: r.isWeekOff ? "#faf8f5" : "" }}>
                   <td style={{ ...CELL, whiteSpace: "nowrap", fontWeight: 600 }}>{r.dateLabel}</td>
-                  <td style={CELL}>{r.inTime || "—"}</td>
-                  <td style={{ ...CELL, color: r.missingCheckout ? "#c00000" : "inherit" }}>
-                    {r.outTime || (r.missingCheckout ? "missing" : "—")}
+                  <td style={{ ...CELL, whiteSpace: "nowrap" }}>
+                    {r.inTime || "—"}<PhotoLink url={r.inPhoto} label="check-in" />
+                  </td>
+                  <td style={{ ...CELL, whiteSpace: "nowrap", color: r.missingCheckout ? "#c00000" : "inherit" }}>
+                    {r.outTime || (r.missingCheckout ? "missing" : "—")}<PhotoLink url={r.outPhoto} label="check-out" />
                   </td>
                   <td style={CELL}>{r.totalHours != null ? r.totalHours.toFixed(2) : "—"}</td>
                   <td style={{ ...CELL, color: r.overTime > 0 ? "#15803d" : "#b0a898", fontWeight: r.overTime > 0 ? 700 : 400 }}>
@@ -145,11 +159,19 @@ export default function OfficeTeamAttendance() {
       const ids = people.map((p) => p.subject_id);
       const from = month;
       const to = monthEnd(month);
-      const [summaries, days, remarks] = await Promise.all([
+      const [summaries, days, remarks, punches] = await Promise.all([
         fetchOfficeTeamMonth(month, ids),
         fetchOfficeTeamDays({ subjectIds: ids, from, to }),
         fetchOfficeTeamRemarks({ from, to }),
+        // Photos are a convenience — a failed read must not take the sheet down.
+        fetchOfficeTeamPunches({ subjectIds: ids, from, to }).catch(() => []),
       ]);
+      const punchBy = new Map();
+      for (const p of punches) {
+        const k = p.employee_id || p.person_ref;
+        if (!punchBy.has(k)) punchBy.set(k, []);
+        punchBy.get(k).push(p);
+      }
       const daysBy = new Map();
       for (const d of days) {
         if (!daysBy.has(d.subject_id)) daysBy.set(d.subject_id, []);
@@ -167,6 +189,7 @@ export default function OfficeTeamAttendance() {
         summary: sumBy.get(subject.subject_id) || null,
         days: daysBy.get(subject.subject_id) || [],
         remarks: remBy.get(subject.subject_id) || [],
+        punches: punchBy.get(subject.subject_id) || [],
         settings: cfg, month,
       })));
     } catch (e) {
