@@ -15,6 +15,12 @@ short version plus the walk-in assessment system, which was built on
 - **Supabase** (hub project `tpfvnerrjhqwipyonngf`). All app tables live in the
   **`hr` schema** — `src/supabaseClient.js` sets `{ db: { schema: "hr" } }`, so
   `supabase.from("applicants")` means `hr.applicants`.
+  **Keep `@supabase/supabase-js` on a current 2.x** (bumped 2.99.1 → 2.118.0 on
+  29 Oct 2026). 2.99.x stole the browser auth lock after 5 s with no guard against
+  the holder stealing it back, so on a slow phone connection a sign-in that
+  overlapped the mount-time session restore failed with
+  "AbortError: Lock was stolen by another request" (Vishal Jain, /attend.html).
+  2.107+ dropped that lock entirely. Do not pin back below 2.100.0.
 - **Vercel**, auto-deploys from `main`. Takes ~1 minute.
 
 ### Multi-page build — three entry points
