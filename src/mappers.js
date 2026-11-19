@@ -80,5 +80,12 @@ export function dbApplicantToApp(row) {
     currentCtc: row.current_ctc,
     expectedCtc: row.expected_ctc,
     noticePeriod: row.notice_period,
+    // hagerstone.com/careers (portal = 'website') only.
+    qualification: row.qualification,
+    currentEmployer: row.current_employer,
+    coverNote: row.cover_note,
+    resumeBucket: row.resume_bucket,   // null = legacy public `resumes` bucket
+    sourceUrl: row.source_url,
+    consentAt: row.consent_at,
   };
 }

@@ -102,6 +102,7 @@ export function AppProvider({ children }) {
   const navBadges = useMemo(() => ({
     jobs:       jobs.filter((j) => PORTALS.some((p) => j[p.id]?.status === "live")).length,
     applicants: applicants.filter((a) => a.stage === "new").length,
+    website:    applicants.filter((a) => a.portal === "website" && a.stage === "new").length,
     survey:     liveCounts.survey,
     assessment: liveCounts.assessment,
     leave:      liveCounts.leave,

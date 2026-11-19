@@ -69,7 +69,14 @@ export const SOURCE_META = {
   // on purpose: a self-reported CTC is a claim, a manual one was heard on a
   // call, and the badge has to say which.
   form:      { label: "Self-applied", color: "#c97a2a", bg: "rgba(201,122,42,0.10)" },
+  // Applied on hagerstone.com/careers (the `website-apply` edge function).
+  // Separate from "form": that is a link HR sends; this is a stranger who
+  // found the careers page.
+  website:   { label: "Website",   color: "#0f766e", bg: "rgba(15,118,110,0.10)" },
 };
+
+// Where the public careers page lives. Shown in the Website Applications panel.
+export const CAREERS_URL = "https://hagerstone.com/careers";
 
 export const SURVEY_SOURCES = [
   { id: "facebook",  label: "Facebook",  color: "#1877f2", bg: "rgba(24,119,242,0.08)" },

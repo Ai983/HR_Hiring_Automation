@@ -32,6 +32,19 @@ export async function uploadResumeFile(path, file) {
   if (error) throw new Error(error.message || "Storage upload failed.");
 }
 
+// A short-lived link to an applicant's CV. Website CVs live in the PRIVATE
+// `candidate-resumes` bucket (readable by hireflow users only); older ones in
+// the public `resumes` bucket. A signed URL works for both, so the caller never
+// has to know which.
+export async function getResumeUrl(app, expiresIn = 300) {
+  if (!supabase) throw new Error("Supabase not configured.");
+  if (!app?.resume_path) throw new Error("No CV on file for this applicant.");
+  const bucket = app.resumeBucket || "resumes";
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(app.resume_path, expiresIn);
+  if (error || !data?.signedUrl) throw new Error(error?.message || "Could not open the CV.");
+  return data.signedUrl;
+}
+
 export async function screenApplicant(appId) {
   if (!supabaseUrl || !supabaseAnon) throw new Error("Supabase not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env and restart the dev server.");
   const url = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/screen-resume`;

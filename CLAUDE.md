@@ -332,6 +332,38 @@ Industry, Total experience\*, Skills, Current CTC, Notice period, Expected CTC.
 
 ---
 
+## Website careers intake (built 19 Nov 2026)
+
+hagerstone.com/careers lists openings and takes applications **with a CV**. They land in
+`hr.applicants` at stage `new`, `portal = 'website'`, attached to the matching job, and show
+in the Kanban **and** in Hire → **Website Applications** (a filtered table, not a second inbox).
+
+| Piece | Path |
+|---|---|
+| Server | `supabase/functions/website-apply/index.ts` (**verify_jwt = false**, multipart) |
+| Migration | `20261119120000_hr_website_careers_intake.sql` |
+| Panel | `src/components/panels/WebsiteApplications.jsx` |
+| CV link | `getResumeUrl()` in `applicantService.js`, "View resume" in `ApplicantModal.jsx` |
+| Which jobs are shown | the **website** repo, `src/data/careers.ts` |
+
+### Things that will bite
+
+- **The website is a different Supabase project.** It holds no key for this one, which is why
+  the function runs with verify_jwt off and does every check itself. Do not add an anon policy.
+- **`hr.jobs.website_slug` links a job to `/careers/<slug>`.** An unknown slug still saves
+  (job_id NULL, title as designation), so a typo never loses a candidate, but the applicant
+  then cannot be auto-screened. Keep the slug in sync when adding a role on the website.
+- **Website CVs are in the PRIVATE `candidate-resumes` bucket**, read through 5-minute signed
+  URLs (`resume_bucket` says which bucket; NULL = the legacy public `resumes`). Do not move
+  them to `resumes`, whose `hr_resumes_all` policy is open to role `public`.
+- **CV text extraction and AI scoring run after the response** (`EdgeRuntime.waitUntil`).
+  If they fail, the application is already saved; HR can click "Screen with AI". `.doc`
+  (legacy Word) is stored but not parsed.
+- **Duplicates:** one application per email **per opening**. Applying for two roles makes two cards.
+- **Bots:** honeypot `company_website` or submit under 3 s → `200 OK`, nothing saved.
+
+---
+
 ## HR policy library + Performance management (built 5 Sep 2026)
 
 Two new panels, plus a dashboard rebuilt as the front door — every page in the

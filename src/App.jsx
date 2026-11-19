@@ -7,6 +7,7 @@ import Toast from "./components/layout/Toast.jsx";
 import Dashboard from "./components/panels/Dashboard.jsx";
 import AllJobs from "./components/panels/AllJobs.jsx";
 import Applicants from "./components/panels/Applicants.jsx";
+import WebsiteApplications from "./components/panels/WebsiteApplications.jsx";
 import Questionnaire from "./components/panels/Questionnaire.jsx";
 import ResumeReport from "./components/panels/ResumeReport.jsx";
 import TodayAttendance from "./components/panels/TodayAttendance.jsx";
@@ -49,7 +50,7 @@ import ResumeUploadModal from "./components/modals/ResumeUploadModal.jsx";
 const COMMON = new Set(["dashboard", "policies", "performance"]);
 
 // Which module each of the rest belongs to.
-const HIRING = new Set(["jobs", "applicants", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment", "questionbank"]);
+const HIRING = new Set(["jobs", "applicants", "website", "calling", "interviews", "reference", "offers", "onboarding", "documents", "questionnaire", "report", "survey", "assessment", "questionbank"]);
 export const moduleForPanel = (p) => (HIRING.has(p) ? "hireflow" : "attendance");
 
 // Panels only a super_admin may open at all — not even read-only.
@@ -122,6 +123,7 @@ function AppContent() {
               {panel === "dashboard"    && <Dashboard />}
               {panel === "jobs"         && <AllJobs />}
               {panel === "applicants"   && <Applicants />}
+              {panel === "website"      && <WebsiteApplications />}
               {panel === "calling"      && <CallingQueue />}
               {panel === "interviews"   && <Interviews />}
               {panel === "reference"    && <ReferenceCheck />}

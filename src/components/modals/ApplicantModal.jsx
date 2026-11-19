@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { STAGES, STAGE_META, PORTALS, SOURCE_META } from "../../constants.js";
 import { fmtDate } from "../../helpers.js";
-import { screenApplicant } from "../../services/applicantService.js";
+import { screenApplicant, getResumeUrl } from "../../services/applicantService.js";
 import { updateApplicantStage } from "../../services/applicantService.js";
 import { supabase } from "../../supabaseClient.js";
 
@@ -34,6 +34,20 @@ export default function ApplicantModal({ app, onClose }) {
     }
   };
 
+  // Open the tab BEFORE the await: a window.open after an async call is
+  // treated as a popup and blocked, which reads as "the button is broken".
+  const openResume = async () => {
+    const tab = window.open("about:blank", "_blank");
+    try {
+      const url = await getResumeUrl(app);
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+    } catch (e) {
+      if (tab) tab.close();
+      showToast(e?.message || "Could not open the CV.", false);
+    }
+  };
+
   const moveStage = async (newStage) => {
     setApplicants((prev) => prev.map((a) => (a.id === app.id ? { ...a, stage: newStage } : a)));
     await updateApplicantStage(app.id, newStage);
@@ -55,6 +69,8 @@ export default function ApplicantModal({ app, onClose }) {
     ["Designation", app.designation],
     ["Department", app.department],
     ["Location", app.location],
+    ["Qualification", app.qualification],
+    ["Current employer", app.currentEmployer],
     ["Industry", app.industry],
     ["Experience", app.experienceYears != null ? `${app.experienceYears} yr` : null],
     ["Notice period", app.noticePeriod],
@@ -102,7 +118,7 @@ export default function ApplicantModal({ app, onClose }) {
             <div style={{ marginBottom: 18, padding: 14, background: "#faf8f5", borderRadius: 10, border: "1px solid #e8e2d9" }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#5a5048", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 10 }}>
                 Candidate profile
-                {app.portal === "form" && (
+                {(app.portal === "form" || app.portal === "website") && (
                   <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: "#c97a2a", background: "rgba(201,122,42,0.10)", padding: "2px 8px", borderRadius: 20, textTransform: "none", letterSpacing: 0 }}>
                     self-reported
                   </span>
@@ -127,6 +143,24 @@ export default function ApplicantModal({ app, onClose }) {
                     ))}
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+
+          {app.coverNote && (
+            <div style={{ marginBottom: 18, padding: 12, background: "#faf8f5", borderRadius: 10, border: "1px solid #e8e2d9" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#5a5048", marginBottom: 6 }}>Note from the candidate</div>
+              <div style={{ fontSize: 13, color: "#3a3028", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{app.coverNote}</div>
+            </div>
+          )}
+
+          {app.resume_path && (
+            <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button className="btn-outline" onClick={openResume}>📄 View resume</button>
+              {app.sourceUrl && (
+                <span style={{ fontSize: 11, color: "#8a7e72" }}>
+                  Applied from <a href={app.sourceUrl} target="_blank" rel="noreferrer" style={{ color: "#c97a2a" }}>{app.sourceUrl.replace(/^https?:\/\//, "")}</a>
+                </span>
               )}
             </div>
           )}

@@ -37,6 +37,7 @@ export function buildNav({ badges = {}, canRegularize = false } = {}) {
       items: [
         { id: "jobs",          panel: "jobs",          icon: "≡",        label: "All Jobs",        badge: b("jobs") },
         { id: "applicants",    panel: "applicants",    icon: "◎",        label: "Applicants",      badge: b("applicants") },
+        { id: "website",       panel: "website",       icon: "\u{1F310}", label: "Website Applications", badge: b("website") },
         { id: "survey",        panel: "survey",        icon: "📋",       label: "Survey Leads",    badge: b("survey") },
         { id: "assessment",    panel: "assessment",    icon: "\u{1F9EE}", label: "Assessment",      badge: b("assessment") },
         { id: "questionbank",  panel: "questionbank",  icon: "\u{1F4DA}", label: "Question Bank" },
